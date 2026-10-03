@@ -1,0 +1,95 @@
+:root{--ink:#1b1a17;--paper:#faf8f3;--rule:#e3ded2;--accent:#b8321f;--link:#1d4ed8}
+html{scroll-behavior:smooth}
+body{background:var(--paper)!important;color:var(--ink)!important;text-rendering:optimizeLegibility}
+::selection{background:#f2d4cc}
+*{scrollbar-width:thin;scrollbar-color:#d6d1c5 transparent}
+
+.backdrop-blur,.backdrop-blur-sm{backdrop-filter:none!important}
+.animate-pulse{animation:none!important}
+.shadow-md,.shadow-lg{box-shadow:none!important}
+.rounded-lg,.rounded-xl,.rounded-2xl{border-radius:4px!important}
+#workbench-drawer,#admin-modal>form,#addVaultModal>div{box-shadow:0 18px 50px rgba(27,26,23,.18)!important}
+[class*="bg-indigo"][class*="text-white"]{color:#fff!important}
+header{background:var(--paper)!important;border-color:var(--ink)!important;border-bottom-width:1px}
+#wiki-sidebar{background:#f6f3ec!important;border-color:var(--rule)!important}
+.tab-content{animation:rise .4s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.poster-card,.poster-card:hover{background:none;box-shadow:none;transform:none}
+.mp-add{display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .95rem;border:1px solid var(--ink);border-radius:3px;font-size:.78rem;font-weight:600;color:var(--ink);transition:all .15s}
+.mp-add:hover{background:var(--ink);color:var(--paper)}
+#reader-title{font-size:clamp(2.1rem,4.5vw,3.3rem);line-height:1.06;font-weight:600;letter-spacing:-.022em}
+#reader-markdown>h1:first-child{display:none}
+
+.wiki-content,.wiki-content p,.wiki-content li{font-family:'Newsreader',Georgia,serif}
+.wiki-content p,.wiki-content li,.wiki-content ul,.wiki-content ol{font-size:1.2rem;line-height:1.72;color:#2b2926}
+.wiki-content h1{font-family:'Newsreader',serif;font-size:2.6rem;font-weight:600;letter-spacing:-.02em;line-height:1.1;border:0;color:var(--ink)}
+.wiki-content h2{font-family:'Newsreader',serif;font-size:1.85rem;font-weight:600;margin-top:2.6rem;border:0;letter-spacing:-.012em;color:var(--ink)}
+.wiki-content h3{font-family:'Newsreader',serif;font-size:1.35rem;font-weight:600;color:var(--ink)}
+.wiki-content a{color:var(--link);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.wiki-content strong{color:var(--ink);font-weight:600}
+.wiki-content blockquote{font-size:1.45rem;line-height:1.45;font-style:italic;color:var(--ink);background:none;border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);border-radius:0;padding:1.1rem 0;margin:2rem 0}
+.wiki-content img{margin:1.6rem auto}
+.wiki-content code:not(pre code){background:#efebe1;color:#7a2a1c;border-radius:3px}
+.wiki-content pre{background:#fff;border:1px solid var(--rule);border-left:3px solid var(--ink);border-radius:3px;box-shadow:0 1px 2px rgba(27,26,23,.05)}
+.hljs{background:transparent!important}
+.wiki-content table{border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--ink);border-radius:0}
+.wiki-content th{background:none;color:var(--ink);border-bottom:1px solid var(--ink);font-family:Inter,sans-serif}
+.wiki-content td{color:#2b2926;border-bottom:1px solid var(--rule);font-family:Inter,sans-serif}
+.wiki-content tr:nth-child(even){background:none}
+.wiki-content .katex-display{margin:1.6rem 0;overflow-x:auto;overflow-y:hidden}
+
+.mp-fig{margin:1.8rem 0;background:#fff;border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 2px rgba(27,26,23,.05);overflow:hidden;font-family:Inter,sans-serif}
+.mp-bar{display:flex;flex-wrap:wrap;gap:.4rem 1rem;padding:.55rem .9rem;border-bottom:1px solid var(--rule)}
+.mp-bar:empty{display:none}
+.mp-canvas{display:block;width:100%;height:300px;cursor:grab;touch-action:pan-y}
+.mp-canvas.grab{cursor:grabbing}
+.mp-foot{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.45rem .9rem;border-top:1px solid var(--rule);font-size:.72rem;color:#8a847a;background:#fbfaf6}
+.mp-legend{display:flex;gap:.9rem}
+.mp-legend span{display:inline-flex;align-items:center;gap:.4rem;color:#4a463f;font-family:'Fira Code',monospace}
+.mp-legend em{width:14px;height:3px;border-radius:2px}
+.mp-coord{margin-left:auto;font-family:'Fira Code',monospace}
+.mp-btns button{background:#fff;border:1px solid #d6d1c5;color:#4a463f;border-radius:3px;padding:1px 9px;margin-left:4px;cursor:pointer}
+.mp-btns button:hover{border-color:var(--ink);color:var(--ink)}
+.mp-scrub{color:var(--link);cursor:ew-resize;border-bottom:2px dotted var(--link);background:rgba(29,78,216,.07);padding:0 .12em;touch-action:none;user-select:none;transition:background .15s}
+.mp-scrub:hover{background:rgba(29,78,216,.18)}
+.mp-chip-s{font-family:'Newsreader',serif;font-style:italic;font-size:1.15rem}
+#mp-tip{position:fixed;transform:translate(-50%,-100%);background:var(--ink);color:var(--paper);font:500 12px 'Fira Code',monospace;padding:4px 9px;border-radius:3px;pointer-events:none;z-index:100;display:none;white-space:nowrap}
+#mp-tip i{font:italic 14px 'Newsreader',serif}
+
+.st-fig{margin:1.8rem 0;background:#fff;border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 2px rgba(27,26,23,.05);overflow:hidden;font-family:Inter,sans-serif;outline:none}
+.st-fig:focus-visible{border-color:var(--link)}
+.st-title{padding:.65rem .95rem 0;font-weight:600;font-size:.9rem;color:var(--ink)}
+.st-stage{position:relative;margin:.65rem .95rem;border:1px solid var(--rule);border-radius:8px;background:#f5f3ee;padding:1.3rem .8rem 1.1rem;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;color:var(--ink)}
+.st-ghost{min-height:3.4rem;width:100%;display:flex;align-items:center;justify-content:center;opacity:.34;pointer-events:none}
+.st-ghost .st-eq{font-size:clamp(.85rem,2.5vw,1.3rem);padding:.2rem 1rem}
+.st-main{display:grid;place-items:center;width:100%;min-height:8rem;pointer-events:none}
+.st-layer{grid-area:1/1;pointer-events:none}
+.st-eq{position:relative;isolation:isolate;padding:.9rem 1.8rem;font-size:clamp(1.05rem,3.4vw,1.75rem);white-space:nowrap}
+.st-box{position:absolute;inset:0;z-index:-1;border:2px solid #e8a03c;border-radius:14px;background:#fff;box-shadow:0 12px 26px -12px rgba(27,26,23,.4)}
+.st-cap{min-height:1.4rem;font-size:.82rem;color:#7d786e;text-align:center;pointer-events:none}
+.st-arrow{position:absolute;top:50%;transform:translateY(-50%);font-size:1.8rem;line-height:1;color:var(--ink);opacity:0;transition:opacity .15s;pointer-events:none;padding:0 .7rem}
+.st-arrow.l{left:.2rem}.st-arrow.r{right:.2rem}
+.st-fig[data-side=l] .st-stage{cursor:w-resize}.st-fig[data-side=r] .st-stage{cursor:e-resize}
+.st-fig[data-side=l]:not([data-first]) .st-arrow.l{opacity:.35}
+.st-fig[data-side=r]:not([data-last]) .st-arrow.r{opacity:.35}
+.st-fig[data-side=l][data-first] .st-stage,.st-fig[data-side=r][data-last] .st-stage{cursor:default}
+.st-foot{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;padding:.45rem .95rem;border-top:1px solid var(--rule);font-size:.72rem;color:#8a847a;background:#fbfaf6}
+.st-count{font-family:'Fira Code',monospace;color:#4a463f}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+#wiki-sidebar.collapsed{display:none}
+@media (max-width:1023px){
+#wiki-sidebar,#wiki-sidebar.collapsed{display:flex;position:fixed;top:0;bottom:0;left:0;z-index:50;width:min(19rem,86vw);margin:0;border-radius:0!important;border-width:0 1px 0 0;transform:translateX(-105%);transition:transform .25s ease}
+#wiki-sidebar.open{transform:none;box-shadow:0 18px 50px rgba(27,26,23,.25)}
+}
+#sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(27,26,23,.35);z-index:40}
+#sidebar-backdrop.show{display:block}
+@media (min-width:1024px){#sidebar-backdrop{display:none!important}}
+#toc-details>summary{list-style:none;cursor:pointer}
+#toc-details>summary::-webkit-details-marker{display:none}
+#toc-details[open]>summary .toc-chev{transform:rotate(180deg)}
+.vault-edit-btn{position:absolute;top:.6rem;right:.6rem;background:rgba(250,248,243,.96);border:1px solid #1b1a17;color:#1b1a17;border-radius:3px;padding:.25rem .65rem;font-size:.72rem;font-weight:600;z-index:2}
+.vault-edit-btn:hover{background:#1b1a17;color:#faf8f3}
+body:not(.is-admin) .admin-only{display:none!important}
+body:not(.is-user) .user-only{display:none!important}
+body.is-admin .non-admin-only{display:none!important}

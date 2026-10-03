@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TheoryWiki Vaults - Knowledge Base (Supabase)</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <!-- Supabase JS SDK v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Kompresi gambar di browser -->
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+
+  <!-- KaTeX CSS and JS for LaTeX rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+
+  <!-- Highlight.js for Syntax Highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Newsreader', 'Georgia', 'serif'],
+            mono: ['Fira Code', 'monospace'],
+          },
+          colors: {
+            vaultDark: '#faf8f3',
+            vaultCard: '#111827',
+            vaultBorder: '#1f293d',
+            goldAccent: '#b8321f',
+            white: '#1b1a17',
+            slate: {50:'#1b1a17',100:'#262420',200:'#35322d',300:'#4a463f',400:'#6b665d',500:'#8a847a',600:'#b9b3a8',700:'#d6d1c5',800:'#e6e1d6',900:'#f3f0e8',950:'#faf8f3'},
+            amber: {200:'#e8b4a8',300:'#d27f6c',400:'#b8321f',500:'#b8321f',600:'#9c2a19',700:'#7f2214'},
+            emerald: {300:'#3fae8a',400:'#0f7a55',500:'#0f7a55',800:'#bfe3d3',900:'#d4eee3',950:'#e6f6ef'},
+            red: {300:'#d1584c',400:'#b42318',500:'#b42318',800:'#f3c9c2',900:'#f8dcd7',950:'#fbeae7'},
+            sky: {400:'#0369a1'}, yellow: {500:'#a16207'}, blue: {400:'#1d4ed8',500:'#1d4ed8'},
+          }
+        }
+      }
+    }
+  </script>
+  <!-- CSS eksternal -->
+  <link rel="stylesheet" href="style/style.css">
+  <style>
+    :root{--ink:#1b1a17;--paper:#faf8f3;--rule:#e3ded2;--accent:#b8321f;--link:#1d4ed8}
+    html{scroll-behavior:smooth}
+    body{background:var(--paper)!important;color:var(--ink)!important;text-rendering:optimizeLegibility}
+    ::selection{background:#f2d4cc}
+    *{scrollbar-width:thin;scrollbar-color:#d6d1c5 transparent}
+    /* meratakan: tanpa gradient, glow, blur, pulse */
+    .backdrop-blur,.backdrop-blur-sm{backdrop-filter:none!important}
+    .animate-pulse{animation:none!important}
+    .shadow-md,.shadow-lg{box-shadow:none!important}
+    .rounded-lg,.rounded-xl,.rounded-2xl{border-radius:4px!important}
+    #workbench-drawer,#admin-modal>form,#addVaultModal>div{box-shadow:0 18px 50px rgba(27,26,23,.18)!important}
+    [class*="bg-indigo"][class*="text-white"]{color:#fff!important}
+    header{background:var(--paper)!important;border-color:var(--ink)!important;border-bottom-width:1px}
+    #wiki-sidebar{background:#f6f3ec!important;border-color:var(--rule)!important}
+    .tab-content{animation:rise .4s ease both}
+    @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .poster-card,.poster-card:hover{background:none;box-shadow:none;transform:none}
+    .mp-add{display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .95rem;border:1px solid var(--ink);border-radius:3px;font-size:.78rem;font-weight:600;color:var(--ink);transition:all .15s}
+    .mp-add:hover{background:var(--ink);color:var(--paper)}
+    #reader-title{font-size:clamp(2.1rem,4.5vw,3.3rem);line-height:1.06;font-weight:600;letter-spacing:-.022em}
+    #reader-markdown>h1:first-child{display:none}
+    /* artikel */
+    .wiki-content,.wiki-content p,.wiki-content li{font-family:'Newsreader',Georgia,serif}
+    .wiki-content p,.wiki-content li,.wiki-content ul,.wiki-content ol{font-size:1.2rem;line-height:1.72;color:#2b2926}
+    .wiki-content h1{font-family:'Newsreader',serif;font-size:2.6rem;font-weight:600;letter-spacing:-.02em;line-height:1.1;border:0;color:var(--ink)}
+    .wiki-content h2{font-family:'Newsreader',serif;font-size:1.85rem;font-weight:600;margin-top:2.6rem;border:0;letter-spacing:-.012em;color:var(--ink)}
+    .wiki-content h3{font-family:'Newsreader',serif;font-size:1.35rem;font-weight:600;color:var(--ink)}
+    .wiki-content a{color:var(--link);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+    .wiki-content strong{color:var(--ink);font-weight:600}
+    .wiki-content blockquote{font-size:1.45rem;line-height:1.45;font-style:italic;color:var(--ink);background:none;border:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);border-radius:0;padding:1.1rem 0;margin:2rem 0}
+    .wiki-content img{margin:1.6rem auto}
+    .wiki-content code:not(pre code){background:#efebe1;color:#7a2a1c;border-radius:3px}
+    .wiki-content pre{background:#fff;border:1px solid var(--rule);border-left:3px solid var(--ink);border-radius:3px;box-shadow:0 1px 2px rgba(27,26,23,.05)}
+    .hljs{background:transparent!important}
+    .wiki-content table{border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--ink);border-radius:0}
+    .wiki-content th{background:none;color:var(--ink);border-bottom:1px solid var(--ink);font-family:Inter,sans-serif}
+    .wiki-content td{color:#2b2926;border-bottom:1px solid var(--rule);font-family:Inter,sans-serif}
+    .wiki-content tr:nth-child(even){background:none}
+    .wiki-content .katex-display{margin:1.6rem 0;overflow-x:auto;overflow-y:hidden}
+    /* grafik interaktif: gaya "cell" Pluto */
+    .mp-fig{margin:1.8rem 0;background:#fff;border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 2px rgba(27,26,23,.05);overflow:hidden;font-family:Inter,sans-serif}
+    .mp-bar{display:flex;flex-wrap:wrap;gap:.4rem 1rem;padding:.55rem .9rem;border-bottom:1px solid var(--rule)}
+    .mp-bar:empty{display:none}
+    .mp-canvas{display:block;width:100%;height:300px;cursor:grab;touch-action:pan-y}
+    .mp-canvas.grab{cursor:grabbing}
+    .mp-foot{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.45rem .9rem;border-top:1px solid var(--rule);font-size:.72rem;color:#8a847a;background:#fbfaf6}
+    .mp-legend{display:flex;gap:.9rem}
+    .mp-legend span{display:inline-flex;align-items:center;gap:.4rem;color:#4a463f;font-family:'Fira Code',monospace}
+    .mp-legend em{width:14px;height:3px;border-radius:2px}
+    .mp-coord{margin-left:auto;font-family:'Fira Code',monospace}
+    .mp-btns button{background:#fff;border:1px solid #d6d1c5;color:#4a463f;border-radius:3px;padding:1px 9px;margin-left:4px;cursor:pointer}
+    .mp-btns button:hover{border-color:var(--ink);color:var(--ink)}
+    .mp-scrub{color:var(--link);cursor:ew-resize;border-bottom:2px dotted var(--link);background:rgba(29,78,216,.07);padding:0 .12em;touch-action:none;user-select:none;transition:background .15s}
+    .mp-scrub:hover{background:rgba(29,78,216,.18)}
+    .mp-chip-s{font-family:'Newsreader',serif;font-style:italic;font-size:1.15rem}
+    #mp-tip{position:fixed;transform:translate(-50%,-100%);background:var(--ink);color:var(--paper);font:500 12px 'Fira Code',monospace;padding:4px 9px;border-radius:3px;pointer-events:none;z-index:100;display:none;white-space:nowrap}
+    #mp-tip i{font:italic 14px 'Newsreader',serif}
+
+    /* slide rumus: blok ```steps (klik kiri/kanan untuk mundur/maju) */
+    .st-fig{margin:1.8rem 0;background:#fff;border:1px solid var(--rule);border-radius:4px;box-shadow:0 1px 2px rgba(27,26,23,.05);overflow:hidden;font-family:Inter,sans-serif;outline:none}
+    .st-fig:focus-visible{border-color:var(--link)}
+    .st-title{padding:.65rem .95rem 0;font-weight:600;font-size:.9rem;color:var(--ink)}
+    .st-stage{position:relative;margin:.65rem .95rem;border:1px solid var(--rule);border-radius:8px;background:#f5f3ee;padding:1.3rem .8rem 1.1rem;min-height:300px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent;color:var(--ink)}
+    .st-ghost{min-height:3.4rem;width:100%;display:flex;align-items:center;justify-content:center;opacity:.34;pointer-events:none}
+    .st-ghost .st-eq{font-size:clamp(.85rem,2.5vw,1.3rem);padding:.2rem 1rem}
+    .st-main{display:grid;place-items:center;width:100%;min-height:8rem;pointer-events:none}
+    .st-layer{grid-area:1/1;pointer-events:none}
+    .st-eq{position:relative;isolation:isolate;padding:.9rem 1.8rem;font-size:clamp(1.05rem,3.4vw,1.75rem);white-space:nowrap}
+    .st-box{position:absolute;inset:0;z-index:-1;border:2px solid #e8a03c;border-radius:14px;background:#fff;box-shadow:0 12px 26px -12px rgba(27,26,23,.4)}
+    .st-cap{min-height:1.4rem;font-size:.82rem;color:#7d786e;text-align:center;pointer-events:none}
+    .st-arrow{position:absolute;top:50%;transform:translateY(-50%);font-size:1.8rem;line-height:1;color:var(--ink);opacity:0;transition:opacity .15s;pointer-events:none;padding:0 .7rem}
+    .st-arrow.l{left:.2rem}.st-arrow.r{right:.2rem}
+    .st-fig[data-side=l] .st-stage{cursor:w-resize}.st-fig[data-side=r] .st-stage{cursor:e-resize}
+    .st-fig[data-side=l]:not([data-first]) .st-arrow.l{opacity:.35}
+    .st-fig[data-side=r]:not([data-last]) .st-arrow.r{opacity:.35}
+    .st-fig[data-side=l][data-first] .st-stage,.st-fig[data-side=r][data-last] .st-stage{cursor:default}
+    .st-foot{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;padding:.45rem .95rem;border-top:1px solid var(--rule);font-size:.72rem;color:#8a847a;background:#fbfaf6}
+    .st-count{font-family:'Fira Code',monospace;color:#4a463f}
+    @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+    /* ---- layout responsif: gutter, sidebar off-canvas di HP ---- */
+    #wiki-sidebar.collapsed{display:none}
+    @media (max-width:1023px){
+      #wiki-sidebar,#wiki-sidebar.collapsed{display:flex;position:fixed;top:0;bottom:0;left:0;z-index:50;width:min(19rem,86vw);margin:0;border-radius:0!important;border-width:0 1px 0 0;transform:translateX(-105%);transition:transform .25s ease}
+      #wiki-sidebar.open{transform:none;box-shadow:0 18px 50px rgba(27,26,23,.25)}
+    }
+    #sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(27,26,23,.35);z-index:40}
+    #sidebar-backdrop.show{display:block}
+    @media (min-width:1024px){#sidebar-backdrop{display:none!important}}
+    #toc-details>summary{list-style:none;cursor:pointer}
+    #toc-details>summary::-webkit-details-marker{display:none}
+    #toc-details[open]>summary .toc-chev{transform:rotate(180deg)}
+    .vault-edit-btn{position:absolute;top:.6rem;right:.6rem;background:rgba(250,248,243,.96);border:1px solid #1b1a17;color:#1b1a17;border-radius:3px;padding:.25rem .65rem;font-size:.72rem;font-weight:600;z-index:2}
+    .vault-edit-btn:hover{background:#1b1a17;color:#faf8f3}
+    body:not(.is-admin) .admin-only{display:none!important}
+    body:not(.is-user) .user-only{display:none!important}
+    body.is-admin .non-admin-only{display:none!important}
+  </style>
+</head>
+
+<body class="h-full bg-vaultDark text-slate-100 font-sans antialiased flex flex-col">
+
+  <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Logo & Sidebar Toggle -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+          <button id="sidebar-toggle-btn" onclick="toggleSidebar()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Toggle Navigation">
+            <i class="fa-solid fa-bars text-lg"></i>
+          </button>
+
+          <div class="flex items-center space-x-2.5 cursor-pointer" onclick="showVaultsGrid()">
+            <div>
+              <span class="text-xl sm:text-2xl font-semibold tracking-tight font-display text-slate-100">TheoryWiki</span>
+              <span class="hidden sm:inline text-[10px] ml-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-mono font-medium border border-amber-500/20">Supabase</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Search Input -->
+        <div class="hidden md:flex flex-1 max-w-md mx-6 relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+            <i class="fa-solid fa-magnifying-glass text-sm"></i>
+          </div>
+          <input type="text" id="wiki-search-input" onkeyup="handleSearch()" placeholder="Cari judul, tag (#kuantum), formula, atau path folder..." class="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-800/80 border border-slate-700/80 rounded-lg focus:outline-none focus:border-amber-500 text-slate-200 placeholder-slate-500 transition">
+        </div>
+
+        <!-- Role Badge & Control Buttons -->
+        <div class="flex items-center space-x-1.5 sm:space-x-2.5">
+          <button onclick="toggleWorkbenchDrawer()" class="px-2.5 py-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/60 rounded-lg transition flex items-center space-x-1.5">
+            <i class="fa-brands fa-python text-sm"></i>
+            <span class="hidden sm:inline">Pyodide WASM</span>
+          </button>
+
+          <button id="admin-status-badge" onclick="promptAdminLogin()" class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition flex items-center space-x-1.5 bg-slate-800/80 border-slate-700 text-slate-400 hover:text-white">
+            <i id="admin-lock-icon" class="fa-solid fa-lock text-slate-500"></i>
+            <span id="admin-status-text" class="max-w-[5.5rem] sm:max-w-none truncate">Mode Publik</span>
+          </button>
+
+          <button onclick="showVaultsGrid()" class="hidden sm:block p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Grid Vaults">
+            <i class="fa-solid fa-table-cells-large text-amber-500"></i>
+          </button>
+
+          <button onclick="switchTab('proposals')" class="user-only relative p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Usulan"><i class="fa-solid fa-inbox text-lg"></i><span id="proposal-badge" class="hidden absolute -top-1 -right-1 bg-amber-500 text-slate-950 text-[10px] font-black rounded-full w-4 h-4 flex items-center justify-center border-2 border-slate-900">0</span></button>
+
+          <button onclick="createNewArticle()" class="hidden sm:flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-300 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md shadow-amber-900/30 transition">
+            <i class="fa-solid fa-pen-nib"></i>
+            <span>Tulis Artikel</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </header>
+
+  <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+
+  <div class="flex-1 min-h-0 max-w-7xl w-full mx-auto flex overflow-hidden px-4 sm:px-6 lg:px-8 py-4 lg:py-6 lg:gap-8">
+    
+    <!-- SIDEBAR -->
+    <aside id="wiki-sidebar" class="w-64 bg-slate-900/90 border border-slate-800 rounded-xl flex-shrink-0 flex flex-col justify-between z-20 overflow-hidden">
+      <div class="p-4 overflow-y-auto flex-1 space-y-5">
+        <div class="flex items-center justify-between lg:hidden">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigasi</span>
+          <button onclick="toggleSidebar()" class="p-1.5 text-slate-400 hover:text-white" title="Tutup"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        
+        <!-- Vault Selector -->
+        <div>
+          <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
+            <span>Aktif Vault</span>
+            <span class="text-[10px] font-mono bg-amber-500/10 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/20" id="sidebar-current-vault-tag">Kuantum</span>
+          </div>
+          <select id="sidebar-vault-select" onchange="switchVault(this.value)" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-medium">
+          </select>
+        </div>
+
+        <!-- Tag Filter Chips -->
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 px-1">Filter Tag Topik</div>
+          <div id="sidebar-tag-chips" class="flex flex-wrap gap-1"></div>
+        </div>
+
+        <!-- Hierarchical Folder Tree -->
+        <div>
+          <div class="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-1">
+            <span>Struktur Folder</span>
+            <button onclick="createNewArticle()" class="text-amber-500 hover:underline text-[10px]">+ Baru</button>
+          </div>
+          <nav id="folder-tree-nav" class="space-y-1 font-mono text-xsNav"></nav>
+        </div>
+
+
+      </div>
+
+      <div class="px-4 py-3 bg-slate-950/60 border-t border-slate-800 text-xs">
+        <div class="flex items-center justify-between text-slate-400">
+          <span class="font-mono text-[11px]"><i class="fa-solid fa-database text-amber-500 mr-1"></i> Supabase</span>
+          <span id="db-status-dot" class="w-2 h-2 rounded-full bg-slate-500 inline-block"></span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col min-w-0 bg-vaultDark overflow-y-auto">
+
+      <!-- VIEW 1: VAULTS GALLERY GRID -->
+      <section id="view-vaults-grid" class="tab-content p-2 sm:p-4 lg:p-8 max-w-7xl w-full mx-auto">
+        <div class="max-w-3xl mb-14 pt-6">
+          <span class="text-xs font-semibold text-amber-400 tracking-[0.2em] uppercase inline-block mb-4">
+            Wiki Physics & Mathematics Knowledge Base
+          </span>
+          <h1 class="text-3xl sm:text-5xl font-extrabold font-display text-white tracking-tight mb-4 leading-tight">
+            Sains & Matematika <span class="text-amber-400 italic">Secara Mendalam</span>
+          </h1>
+          <p class="text-slate-400 text-sm leading-relaxed">
+            Eksplorasi brankas pengetahuan interaktif berformat Markdown & LaTeX. Didukung oleh mesin eksekusi Python Pyodide dan penyimpanan cloud Supabase.
+          </p>
+          <div class="flex flex-wrap gap-x-6 gap-y-2 mt-8" id="vault-filter-tags"></div>
+          <div class="mt-5 admin-only"><button onclick="openAddVaultModal()" class="mp-add"><i class="fa-solid fa-plus"></i> Tambah Vault</button></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-14" id="vaults-card-grid"></div>
+      </section>
+
+      <!-- VIEW 2: ARTICLE READER -->
+      <section id="view-reader" class="tab-content hidden p-2 sm:p-4 lg:p-8 max-w-5xl w-full mx-auto">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-slate-800 gap-4">
+          <div>
+            <div class="flex items-center space-x-2 mb-2 flex-wrap gap-y-1">
+              <span id="reader-vault-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                Vault: Kuantum
+              </span>
+              <span id="reader-path-breadcrumb" class="text-xs text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                docs/kuantum/persamaan-schrodinger.md
+              </span>
+            </div>
+            <h1 id="reader-title" class="text-3xl sm:text-4xl font-extrabold font-display text-white tracking-tight">Loading Article...</h1>
+            <div id="reader-tags-container" class="flex flex-wrap gap-1.5 mt-2"></div>
+          </div>
+
+          <div class="flex items-center space-x-2 shrink-0">
+            <button onclick="editCurrentArticle()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-md transition flex items-center space-x-1.5">
+              <i class="fa-solid fa-pen-to-square"></i>
+              <span id="reader-edit-label">Usulkan Edit</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+          <div class="lg:col-span-3">
+            <article id="reader-markdown" class="wiki-content"></article>
+
+            <div class="mt-12 pt-6 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
+              <div>
+                <span>Terakhir diperbarui </span>
+                <code id="reader-updated-at" class="font-mono text-amber-400">-</code>
+              </div>
+              <div class="font-mono">Format: GFM + KaTeX + Pyodide WASM</div>
+            </div>
+          </div>
+
+          <!-- Daftar isi: di atas artikel pada layar kecil (bisa dilipat), kolom kanan sticky pada layar besar -->
+          <aside class="order-first lg:order-none min-w-0">
+            <details id="toc-details" class="bg-slate-900/80 rounded-xl border border-slate-800 lg:sticky lg:top-2">
+              <summary class="p-4 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                <span>Daftar Isi <span id="toc-count" class="font-mono text-slate-500 normal-case tracking-normal"></span></span>
+                <i class="fa-solid fa-chevron-down toc-chev text-slate-500 lg:hidden transition-transform"></i>
+                <i class="fa-solid fa-list-ul text-slate-500 hidden lg:inline"></i>
+              </summary>
+              <ul id="reader-toc" class="px-4 pb-4 space-y-1.5 text-xs text-slate-400 max-h-64 lg:max-h-[calc(100vh-11rem)] overflow-y-auto"></ul>
+            </details>
+          </aside>
+        </div>
+      </section>
+
+      <!-- VIEW 3: EDITOR WITH MARKDOWN TOOLBAR & IMAGE DROP -->
+      <section id="view-editor" class="tab-content hidden p-0 sm:p-2 lg:p-4 max-w-7xl w-full mx-auto flex flex-col h-full">
+        <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-800 shrink-0">
+          <div>
+            <h2 id="editor-page-heading" class="text-xl font-bold font-display text-white">Tulis / Edit Artikel</h2>
+            <p class="text-xs text-slate-400">Mendukung Tabel, Upload Gambar (Ctrl+V), LaTeX ($...$), Tag, dan Python WASM.</p>
+          </div>
+          <button onclick="switchTab('reader')" class="text-xs text-slate-400 hover:text-white">
+            Batal & Kembali
+          </button>
+        </div>
+
+        <form id="article-editor-form" onsubmit="handleEditorSubmit(event)" class="space-y-3 flex-1 flex flex-col min-h-0">
+          
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 shrink-0">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Vault Tujuan</label>
+              <select id="editor-vault" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200">
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Folder Path (Hirarki)</label>
+              <input type="text" id="editor-folder" placeholder="e.g. kuantum/mekanika" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 font-mono text-slate-200">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Article Slug / ID</label>
+              <input type="text" id="editor-id" required placeholder="kuantum-101" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 font-mono text-slate-200">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Judul Artikel</label>
+              <input type="text" id="editor-title" required placeholder="Judul Artikel..." class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200">
+            </div>
+          </div>
+
+          <div class="shrink-0">
+            <label class="block text-xs font-medium text-slate-300 mb-1">Tag Topik (Pisahkan koma)</label>
+            <input type="text" id="editor-tags" placeholder="kuantum, simulasi, pde, matematika" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200 font-mono">
+          </div>
+
+          <!-- Quick Formatting Toolbar -->
+          <div class="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0 text-xs">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-slate-500 px-2">Format:</span>
+            <button type="button" onclick="insertSnippet('table')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-solid fa-table mr-1 text-amber-500"></i>Tabel
+            </button>
+            
+            <label class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium cursor-pointer">
+              <i class="fa-regular fa-image mr-1 text-emerald-500"></i>Upload Gambar
+              <input type="file" id="editor-image-file" accept="image/*" multiple class="hidden" onchange="handleFileSelectImage(event)">
+            </label>
+
+            <select id="img-provider-select" onchange="setImageProvider(this.value)" title="Tujuan upload gambar" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
+              <option value="supabase">Gambar → Supabase</option>
+              <option value="imgur">Gambar → Imgur</option>
+              <option value="cloudinary">Gambar → Cloudinary</option>
+            </select>
+            <span id="img-upload-status" class="text-[11px] font-mono text-slate-500"></span>
+
+            <button type="button" onclick="insertSnippet('math')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-solid fa-calculator mr-1 text-blue-500"></i>LaTeX Math ($$)
+            </button>
+            <button type="button" onclick="insertSnippet('python')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-brands fa-python mr-1 text-yellow-500"></i>Python Code
+            </button>
+            <button type="button" onclick="insertSnippet('graph')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-solid fa-chart-line mr-1 text-sky-400"></i>Grafik Interaktif
+            </button>
+            <button type="button" onclick="insertSnippet('steps')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-solid fa-forward-step mr-1 text-amber-400"></i>Slide Rumus
+            </button>
+            <span class="text-[10px] text-slate-500 ml-auto hidden sm:inline"><i class="fa-regular fa-paste mr-1"></i>Bisa Paste Gambar (Ctrl+V)</span>
+          </div>
+
+          <!-- Side-by-Side Editor & Live Preview -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-[350px]">
+            <div class="flex flex-col h-full relative">
+              <textarea id="editor-content" oninput="updateLivePreview()" required placeholder="Tulis markdown di sini... (Paste Ctrl+V untuk upload gambar)" class="w-full flex-1 p-3 font-mono text-xs bg-slate-900 border border-slate-800 rounded-lg focus:border-amber-500 text-slate-200 resize-none"></textarea>
+            </div>
+
+            <div class="flex flex-col h-full overflow-hidden">
+              <div id="editor-live-preview" class="w-full flex-1 p-4 bg-slate-900/60 border border-slate-800 rounded-lg overflow-y-auto wiki-content"></div>
+            </div>
+          </div>
+
+          <div class="non-admin-only shrink-0">
+            <label class="block text-xs font-medium text-slate-300 mb-1">Catatan untuk admin (opsional)</label>
+            <input type="text" id="editor-note" maxlength="300" placeholder="Ringkas apa yang Anda ubah / sumbernya..." class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200">
+          </div>
+
+          <div class="flex justify-end space-x-3 shrink-0">
+            <button type="submit" class="px-5 py-2 text-xs font-semibold text-slate-950 bg-amber-400 hover:bg-amber-300 rounded-lg shadow-md transition flex items-center space-x-2">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span id="editor-submit-btn-text">Simpan Artikel</span>
+            </button>
+          </div>
+
+        </form>
+      </section>
+
+      <!-- VIEW 4: USULAN PERUBAHAN -->
+      <section id="view-proposals" class="tab-content hidden p-2 sm:p-4 lg:p-6 max-w-5xl w-full mx-auto">
+        <div class="mb-6 pb-4 border-b border-slate-800">
+          <h2 class="text-2xl font-bold font-display text-white flex items-center gap-2"><i class="fa-solid fa-inbox text-amber-500"></i><span id="proposals-heading">Usulan Saya</span></h2>
+          <p id="proposals-subheading" class="text-xs text-slate-400"></p>
+        </div>
+        <div id="proposal-cards" class="space-y-4"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- PYTHON WORKBENCH DRAWER -->
+  <div id="workbench-drawer" class="fixed inset-y-0 right-0 w-full max-w-xl bg-slate-900 border-l border-slate-800 shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
+    <div class="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <i class="fa-brands fa-python text-amber-500 text-lg"></i>
+        <h3 class="font-bold font-display text-white text-sm">Pyodide WASM Scientific Workbench</h3>
+      </div>
+      <button onclick="toggleWorkbenchDrawer()" class="text-slate-400 hover:text-white p-1">
+        <i class="fa-solid fa-xmark text-base"></i>
+      </button>
+    </div>
+
+    <div class="p-4 flex-1 flex flex-col space-y-3 overflow-y-auto">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Editor Kode Python (NumPy, SciPy, Matplotlib)</label>
+        <textarea id="workbench-editor" class="w-full h-44 p-3 font-mono text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:border-amber-500 resize-none" placeholder="import numpy as np&#10;import matplotlib.pyplot as plt&#10;&#10;x = np.linspace(0, 10, 100)&#10;plt.plot(x, np.sin(x))&#10;plt.title('Sin Wave')&#10;plt.show()"></textarea>
+      </div>
+
+      <div class="flex justify-between items-center">
+        <span class="text-[10px] text-slate-500 font-mono">Backend: WASM Pyodide (Agg Backend)</span>
+        <button onclick="runWorkbenchCode()" class="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg text-xs transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-play text-xs"></i>
+          <span>Jalankan Python</span>
+        </button>
+      </div>
+
+      <div class="flex-1 flex flex-col min-h-[200px]">
+        <label class="block text-xs text-slate-400 mb-1">Konsol / Plot Output</label>
+        <div id="workbench-output" class="flex-1 p-3 bg-slate-950 border border-slate-800 rounded-lg font-mono text-xs text-emerald-400 overflow-y-auto whitespace-pre-wrap">
+          [Info] Klik 'Jalankan Python' untuk mengeksekusi kode...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN / DAFTAR (Supabase Auth) -->
+  <div id="admin-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <form onsubmit="handleAdminLogin(event)" class="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-2 text-xl">
+          <i class="fa-solid fa-user-shield"></i>
+        </div>
+        <h3 id="auth-title" class="text-lg font-bold text-white font-display">Masuk</h3>
+        <p id="auth-subtitle" class="text-xs text-slate-400"></p>
+      </div>
+      <input type="text" id="auth-name-input" maxlength="60" placeholder="Nama tampilan (opsional)" class="hidden w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none">
+      <input type="email" id="admin-email-input" required autocomplete="username" placeholder="Email" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none">
+      <input type="password" id="admin-password-input" required autocomplete="current-password" placeholder="Password" class="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none">
+      <p id="admin-login-error" class="text-[11px] text-red-400 hidden text-center"></p>
+      <div class="flex space-x-2">
+        <button type="button" onclick="closeAdminModal()" class="w-1/2 py-2 text-xs font-semibold text-slate-400 hover:bg-slate-800 rounded-lg transition">Batal</button>
+        <button type="submit" class="w-1/2 py-2 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg font-bold shadow transition"><span id="auth-submit-text">Masuk</span></button>
+      </div>
+      <button type="button" id="auth-switch-btn" onclick="setAuthMode(authMode === 'login' ? 'signup' : 'login')" class="w-full text-center text-[11px] text-amber-400 hover:underline">Belum punya akun? Daftar</button>
+    </form>
+  </div>
+
+  <!-- Modal Input Vault Baru -->
+    <div id="addVaultModal" onclick="if(event.target===this)closeAddVaultModal()" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
+        <h3 id="vault-modal-title" class="text-xl font-bold text-white mb-4">Buat Vault Baru</h3>
+        
+        <form id="addVaultForm" onsubmit="handleVaultSubmit(event)" class="space-y-4">
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">ID Vault (Unik)</label>
+            <input type="text" id="vaultId" required placeholder="contoh: astrofisika" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+            <p id="vault-id-hint" class="hidden text-[11px] text-slate-500 mt-1">Mengubah ID ikut memindahkan semua artikel di vault ini. Path folder artikel tidak berubah otomatis.</p>
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Judul Vault</label>
+            <input type="text" id="vaultTitle" required placeholder="contoh: Astrofisika & Kosmologi" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Tag / Kategori</label>
+            <input type="text" id="vaultTag" required placeholder="contoh: Sains Antariksa" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">URL Poster Gambar</label>
+            <input type="url" id="vaultPoster" required oninput="previewPoster()" placeholder="https://images.unsplash.com/..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500">
+            <div class="flex items-center gap-2 mt-2">
+              <label class="mp-add cursor-pointer"><i class="fa-solid fa-upload"></i> Unggah gambar<input type="file" accept="image/*" class="hidden" onchange="handlePosterFile(event)"></label>
+              <span id="vault-poster-status" class="text-[11px] font-mono text-slate-500"></span>
+            </div>
+            <img id="vault-poster-preview" class="hidden mt-2 w-full h-28 object-cover rounded border border-slate-700" alt="Pratinjau poster">
+        </div>
+
+        <div>
+            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Deskripsi Ringkas</label>
+            <textarea id="vaultDescription" required rows="3" placeholder="Penjelasan singkat mengenai isi vault..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+            <button type="button" onclick="closeAddVaultModal()" class="px-4 py-2 rounded-lg text-slate-400 hover:text-white text-sm font-medium transition">
+            Batal
+            </button>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition">
+            <span id="vault-submit-text">Simpan Vault</span>
+            </button>
+        </div>
+        </form>
+    </div>
+    </div>
+<script src="script/script.js"></script>
+</body>
+</html>

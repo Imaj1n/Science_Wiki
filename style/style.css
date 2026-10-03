@@ -1,0 +1,29 @@
+    body { background-color: #0b0f19; color: #e2e8f0; }
+
+    .poster-card {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.95) 100%);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .poster-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.7), 0 0 15px rgba(217, 119, 6, 0.3);
+    }
+
+    /* Markdown Styling */
+    .wiki-content h1 { font-size: 2.25rem; font-weight: 800; margin-bottom: 1.25rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.5rem; color: #f8fafc; font-family: 'Cinzel', serif; }
+    .wiki-content h2 { font-size: 1.5rem; font-weight: 700; margin-top: 1.75rem; margin-bottom: 0.75rem; border-bottom: 1px solid #1e293b; padding-bottom: 0.25rem; color: #f1f5f9; }
+    .wiki-content h3 { font-size: 1.2rem; font-weight: 600; margin-top: 1.25rem; margin-bottom: 0.5rem; color: #e2e8f0; }
+    .wiki-content p { margin-bottom: 1rem; line-height: 1.8; color: #cbd5e1; font-size: 0.95rem; }
+    .wiki-content ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
+    .wiki-content ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 1rem; color: #cbd5e1; }
+    .wiki-content code:not(pre code) { background-color: #1e293b; color: #93c5fd; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-family: 'Fira Code', monospace; font-size: 0.85em; }
+    .wiki-content pre { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 0.75rem; padding: 1rem; margin-bottom: 1.25rem; overflow-x: auto; position: relative; }
+    .wiki-content blockquote { border-left: 4px solid #d97706; padding-left: 1rem; font-style: italic; color: #94a3b8; margin-bottom: 1rem; background-color: rgba(30, 41, 59, 0.3); padding-top: 0.5rem; padding-bottom: 0.5rem; border-radius: 0 0.5rem 0.5rem 0; }
+    .wiki-content table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; overflow: hidden; border-radius: 0.5rem; border: 1px solid #1e293b; }
+    .wiki-content th { background-color: #1e293b; color: #f8fafc; font-weight: 600; text-align: left; padding: 0.75rem 1rem; border-bottom: 1px solid #334155; font-size: 0.85rem; }
+    .wiki-content td { padding: 0.75rem 1rem; border-bottom: 1px solid #1e293b; color: #cbd5e1; font-size: 0.85rem; }
+    .wiki-content tr:nth-child(even) { background-color: rgba(30, 41, 59, 0.2); }
+
+
+    #wiki-sidebar { transition: margin-left 0.25s ease-in-out; }
+    #wiki-sidebar.collapsed { margin-left: -16rem; }
