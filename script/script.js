@@ -529,16 +529,16 @@ plt.close('all')
 
     const stdout = pyodide.runPython(`sys.stdout.getvalue()`);
 
-    const hasPlot = pyodide.runPython(`
-img_str = ""
-if len(plt.get_fignums()) > 0:
-buf = io.BytesIO()
-plt.savefig(buf, format='png', bbox_inches='tight')
-buf.seek(0)
-img_str = base64.b64encode(buf.read()).decode('utf-8')
-plt.close('all')
-img_str
-    `);
+    const hasPlot = pyodide.runPython([
+  'img_str = ""',
+  'if len(plt.get_fignums()) > 0:',
+  '    buf = io.BytesIO()',
+  "    plt.savefig(buf, format='png', bbox_inches='tight')",
+  '    buf.seek(0)',
+  "    img_str = base64.b64encode(buf.read()).decode('utf-8')",
+  "    plt.close('all')",
+  'img_str'
+].join('\n'));
 
     let resultHTML = "";
     if (stdout) {
