@@ -30,6 +30,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/latex.min.js"></script>
 
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
@@ -160,12 +161,13 @@
     body:not(.is-user) .user-only{display:none!important}
     body.is-admin .non-admin-only{display:none!important}
   </style>
+  <link rel="stylesheet" href="style/features.css">
 </head>
 
 <body class="h-full bg-vaultDark text-slate-100 font-sans antialiased flex flex-col">
 
   <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="page-shell">
       <div class="flex items-center justify-between h-16">
         
         <!-- Logo & Sidebar Toggle -->
@@ -192,6 +194,10 @@
 
         <!-- Role Badge & Control Buttons -->
         <div class="flex items-center space-x-1.5 sm:space-x-2.5">
+          <button id="view-settings-btn" type="button" onclick="toggleViewSettings()" class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Tampilan: lebar, margin, ukuran teks">
+            <i class="fa-solid fa-sliders text-base"></i>
+          </button>
+
           <button onclick="toggleWorkbenchDrawer()" class="px-2.5 py-1.5 text-xs font-semibold text-emerald-400 bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-800/60 rounded-lg transition flex items-center space-x-1.5">
             <i class="fa-brands fa-python text-sm"></i>
             <span class="hidden sm:inline">Pyodide WASM</span>
@@ -220,7 +226,7 @@
 
   <div id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-  <div class="flex-1 min-h-0 max-w-7xl w-full mx-auto flex overflow-hidden px-4 sm:px-6 lg:px-8 py-4 lg:py-6 lg:gap-8">
+  <div class="page-shell flex-1 min-h-0 flex overflow-hidden py-4 lg:py-6 lg:gap-6">
     
     <!-- SIDEBAR -->
     <aside id="wiki-sidebar" class="w-64 bg-slate-900/90 border border-slate-800 rounded-xl flex-shrink-0 flex flex-col justify-between z-20 overflow-hidden">
@@ -289,7 +295,7 @@
       </section>
 
       <!-- VIEW 2: ARTICLE READER -->
-      <section id="view-reader" class="tab-content hidden p-2 sm:p-4 lg:p-8 max-w-5xl w-full mx-auto">
+      <section id="view-reader" class="tab-content hidden reader-shell">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-slate-800 gap-4">
           <div>
             <div class="flex items-center space-x-2 mb-2 flex-wrap gap-y-1">
@@ -312,8 +318,8 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-          <div class="lg:col-span-3">
+        <div class="reader-grid">
+          <div class="min-w-0">
             <article id="reader-markdown" class="wiki-content"></article>
 
             <div class="mt-12 pt-6 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
@@ -409,6 +415,25 @@
             <button type="button" onclick="insertSnippet('steps')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
               <i class="fa-solid fa-forward-step mr-1 text-amber-400"></i>Slide Rumus
             </button>
+            <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan kotak/callout" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
+              <option value="">Kotak ▾</option>
+              <option value="c-theorem">Teorema</option><option value="c-lemma">Lema</option>
+              <option value="c-definition">Definisi</option><option value="c-proof">Bukti</option>
+              <option value="c-example">Contoh</option><option value="c-note">Catatan</option>
+              <option value="c-info">Info</option><option value="c-tip">Tips</option>
+              <option value="c-warning">Peringatan</option><option value="c-danger">Bahaya</option>
+              <option value="c-fold">Terlipat (+/-)</option>
+            </select>
+            <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan listing kode" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
+              <option value="">Kode ▾</option>
+              <option value="k-python-hide">Python (tersembunyi)</option>
+              <option value="k-latex">LaTeX</option><option value="k-julia">Julia</option>
+              <option value="k-cpp">C++</option><option value="k-js">JavaScript</option>
+            </select>
+            <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan link/tag inline" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
+              <option value="">Link ▾</option>
+              <option value="ref-wiki">[[Link artikel]]</option><option value="ref-tag">#tag inline</option>
+            </select>
             <span class="text-[10px] text-slate-500 ml-auto hidden sm:inline"><i class="fa-regular fa-paste mr-1"></i>Bisa Paste Gambar (Ctrl+V)</span>
           </div>
 
@@ -451,6 +476,20 @@
   </div>
 
   <!-- PYTHON WORKBENCH DRAWER -->
+  <!-- PANEL TAMPILAN -->
+  <div id="view-settings-panel" class="hidden">
+    <h4><i class="fa-solid fa-sliders mr-1"></i> Tampilan</h4>
+    <div class="vs-row"><label for="vs-width">Lebar konten <span id="vs-width-val"></span></label>
+      <input type="range" id="vs-width" min="720" max="2200" step="20"></div>
+    <div class="vs-row"><label for="vs-pad">Margin samping <span id="vs-pad-val"></span></label>
+      <input type="range" id="vs-pad" min="0" max="120" step="4"></div>
+    <div class="vs-row"><label for="vs-font">Ukuran teks <span id="vs-font-val"></span></label>
+      <input type="range" id="vs-font" min="80" max="140" step="5"></div>
+    <label class="vs-check"><input type="checkbox" id="vs-hidecode"> Sembunyikan semua kode</label>
+    <button type="button" id="vs-reset" class="vs-reset">Reset</button>
+    <p class="vs-hint">Geser lebar konten ke ujung kanan untuk lebar penuh. Pengaturan tersimpan di browser ini.</p>
+  </div>
+
   <div id="workbench-drawer" class="fixed inset-y-0 right-0 w-full max-w-xl bg-slate-900 border-l border-slate-800 shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col">
     <div class="p-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
       <div class="flex items-center space-x-2">
@@ -555,6 +594,7 @@
         </form>
     </div>
     </div>
+<script src="script/extras.js"></script>
 <script src="script/script.js"></script>
 </body>
 </html>

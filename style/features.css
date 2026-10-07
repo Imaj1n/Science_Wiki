@@ -1,0 +1,135 @@
+/* ==========================================================================
+   features.css — dimuat SETELAH <style> inline di index.html (menang urutan)
+   ========================================================================== */
+
+/* ---------- 1. Margin & lebar yang bisa diatur (variabel diisi extras.js) ---------- */
+:root{ --read-max:1360px; --side-pad:20px; --fs-scale:1; }
+
+.page-shell{
+  width:100%; margin-inline:auto;
+  max-width:calc(var(--read-max) + 20rem);
+  padding-inline:var(--side-pad);
+}
+@media (max-width:639px){ .page-shell{ padding-inline:min(var(--side-pad),1rem); } }
+
+#view-reader.reader-shell{ max-width:var(--read-max); padding:.75rem 0 2rem; margin-inline:auto; width:100%; }
+@media (min-width:1024px){ #view-reader.reader-shell{ padding-top:1.25rem; } }
+
+/* artikel di kiri, daftar isi lebar tetap di kanan -> slider lebar = lebar artikel */
+.reader-grid{ display:grid; grid-template-columns:minmax(0,1fr); gap:1.25rem; }
+@media (min-width:1024px){ .reader-grid{ grid-template-columns:minmax(0,1fr) 15rem; gap:2rem; } }
+
+/* ukuran teks artikel mengikuti slider */
+.wiki-content p,.wiki-content li,.wiki-content ul,.wiki-content ol{ font-size:calc(1.2rem * var(--fs-scale)); }
+
+/* panel Tampilan */
+#view-settings-panel{
+  position:fixed; top:4rem; right:max(.75rem,var(--side-pad)); z-index:60; width:18rem;
+  background:#fff; border:1px solid var(--ink); border-radius:4px;
+  box-shadow:0 18px 50px rgba(27,26,23,.18); padding:.9rem 1rem 1rem; font-family:Inter,sans-serif;
+}
+#view-settings-panel.hidden{ display:none; }
+#view-settings-panel h4{ font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#6b665d; margin-bottom:.7rem; }
+.vs-row{ margin-bottom:.8rem; }
+.vs-row label{ display:flex; justify-content:space-between; font-size:.75rem; font-weight:600; color:var(--ink); margin-bottom:.25rem; }
+.vs-row label span{ font-family:'Fira Code',monospace; font-weight:500; color:#6b665d; }
+#view-settings-panel input[type=range]{ width:100%; accent-color:var(--accent); }
+.vs-check{ display:flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--ink); cursor:pointer; }
+.vs-reset{ margin-top:.5rem; font-size:.72rem; font-weight:600; border:1px solid #d6d1c5; border-radius:3px; padding:.25rem .7rem; background:#fff; color:#4a463f; }
+.vs-reset:hover{ border-color:var(--ink); color:var(--ink); }
+.vs-hint{ font-size:.68rem; color:#8a847a; margin-top:.6rem; line-height:1.4; }
+
+/* ---------- 2. Callout / kotak ---------- */
+.wiki-content .callout{
+  --c:#475569; --bg:#f4f5f7; margin:1.6rem 0; border:1px solid color-mix(in srgb,var(--c) 28%,transparent);
+  border-left:4px solid var(--c); border-radius:4px; background:var(--bg); overflow:hidden;
+  font-family:'Newsreader',Georgia,serif;
+}
+.callout-title{
+  display:flex; align-items:center; gap:.55rem; padding:.55rem .9rem; list-style:none; cursor:default;
+  font-family:Inter,sans-serif; font-size:.82rem; font-weight:700; color:var(--c); letter-spacing:.01em;
+}
+summary.callout-title{ cursor:pointer; user-select:none; }
+summary.callout-title::-webkit-details-marker{ display:none; }
+.callout-icon{ font-size:.85rem; }
+.callout-name{ font-weight:500; color:var(--ink); }
+.callout-chev{ margin-left:auto; font-size:.7rem; transition:transform .15s; }
+details.callout[open] .callout-chev{ transform:rotate(180deg); }
+.callout-body{ padding:.15rem 1rem .35rem; }
+.callout-body > :first-child{ margin-top:.2rem; }
+.callout-body > :last-child{ margin-bottom:.45rem; }
+.wiki-content .callout-body p,.wiki-content .callout-body li{ font-size:calc(1.12rem * var(--fs-scale)); }
+.callout-body .katex-display{ margin:1rem 0; }
+.callout .cb{ margin:1rem 0; }
+
+/* warna per tipe */
+.wiki-content .callout-info,.wiki-content .callout-note{ --c:#1d4ed8; --bg:#eff4ff; }
+.wiki-content .callout-note{ --c:#475569; --bg:#f4f5f7; }
+.wiki-content .callout-tip{ --c:#0f7a55; --bg:#ecf8f2; }
+.wiki-content .callout-success{ --c:#15803d; --bg:#eefaf1; }
+.wiki-content .callout-important{ --c:#7c3aed; --bg:#f5f0ff; }
+.wiki-content .callout-warning{ --c:#b45309; --bg:#fff7e8; }
+.wiki-content .callout-danger{ --c:#b42318; --bg:#fdeeec; }
+.wiki-content .callout-question{ --c:#0e7490; --bg:#ecf8fb; }
+
+/* gaya buku matematika: isi miring (teorema/lema/...), bukti & contoh tegak */
+.callout-math{ border-left-width:3px; }
+.wiki-content .callout-theorem{ --c:#b8321f; --bg:#fdf3f0; }
+.wiki-content .callout-lemma{ --c:#9a3412; --bg:#fff4ec; }
+.wiki-content .callout-proposition{ --c:#a16207; --bg:#fff9e6; }
+.wiki-content .callout-corollary{ --c:#7c3aed; --bg:#f6f1ff; }
+.wiki-content .callout-definition{ --c:#1d4ed8; --bg:#eff4ff; }
+.wiki-content .callout-proof{ --c:#475569; --bg:#fafaf8; border-left-style:dashed; }
+.wiki-content .callout-example{ --c:#0f7a55; --bg:#f1faf5; }
+.wiki-content .callout-remark{ --c:#6b665d; --bg:#faf8f3; }
+.wiki-content .callout-theorem .callout-body,.wiki-content .callout-lemma .callout-body,.wiki-content .callout-proposition .callout-body,.wiki-content .callout-corollary .callout-body{ font-style:italic; }
+.wiki-content .callout-theorem .callout-body .katex,.wiki-content .callout-lemma .callout-body .katex,
+.wiki-content .callout-proposition .callout-body .katex,.wiki-content .callout-corollary .callout-body .katex{ font-style:normal; }
+.wiki-content .callout-proof .callout-body > :last-child::after{ content:'\220E'; float:right; font-style:normal; color:var(--c); }
+
+/* ---------- 3. Blok kode ---------- */
+.wiki-content .cb{ margin:1.4rem 0; border:1px solid var(--rule); border-left:3px solid var(--ink); border-radius:3px; background:#fff; box-shadow:0 1px 2px rgba(27,26,23,.05); overflow:hidden; }
+.cb-head{ display:flex; align-items:center; flex-wrap:wrap; gap:.35rem .8rem; padding:.35rem .6rem .35rem .8rem; background:#fbfaf6; border-bottom:1px solid var(--rule); font-family:Inter,sans-serif; font-size:.72rem; color:#4a463f; }
+.cb.is-folded .cb-head{ border-bottom:0; }
+.cb-lang{ display:inline-flex; align-items:center; gap:.4rem; font-weight:700; color:var(--ink); }
+.cb-lang i{ color:var(--accent); }
+.cb-title{ font-family:'Fira Code',monospace; color:#6b665d; }
+.cb-meta{ color:#9a948a; font-family:'Fira Code',monospace; font-size:.68rem; }
+.cb-actions{ margin-left:auto; display:flex; gap:.35rem; }
+.cb-btn{ display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .6rem; border:1px solid #d6d1c5; border-radius:3px; background:#fff; color:#4a463f; font-size:.7rem; font-weight:600; cursor:pointer; }
+.cb-btn:hover{ border-color:var(--ink); color:var(--ink); }
+.cb-btn-run{ color:#0f7a55; border-color:#bfe3d3; background:#ecf8f2; }
+.cb-btn-run:hover{ background:#0f7a55; color:#fff; border-color:#0f7a55; }
+@media (max-width:520px){ .cb-btn span{ display:none; } .cb-meta{ display:none; } }
+.wiki-content .cb pre{ margin:0!important; border:0!important; border-radius:0!important; box-shadow:none!important; background:#fff; }
+.cb.is-folded pre{ display:none; }
+.cb-out{ padding:.65rem .9rem; border-top:1px solid var(--rule); background:#fbfaf6; }
+.cb code.with-lines{ counter-reset:ln; }
+.cb code .ln{ display:inline-block; width:100%; }
+.cb code .ln::before{ counter-increment:ln; content:counter(ln); display:inline-block; width:2.2em; margin-right:1em; text-align:right; color:#b9b3a8; user-select:none; }
+/* highlight.js tema terang: sesuaikan sedikit agar serasi dengan kertas */
+.cb .hljs-comment,.cb .hljs-quote{ color:#8a847a; font-style:italic; }
+
+/* ---------- 4. Tag & link inline ---------- */
+.wiki-content a.tag-ref{
+  font-family:'Fira Code',monospace; font-size:.8em; text-decoration:none; color:#9c2a19;
+  background:#fbe9e5; border:1px solid #f0cdc6; border-radius:999px; padding:.05em .55em; white-space:nowrap;
+}
+.wiki-content a.tag-ref:hover{ background:#b8321f; color:#fff; border-color:#b8321f; }
+.wiki-content a.wikilink{ color:var(--link); text-decoration:none; border-bottom:1px solid color-mix(in srgb,var(--link) 45%,transparent); }
+.wiki-content a.wikilink:hover{ background:rgba(29,78,216,.08); }
+.wiki-content a.wikilink.broken{ color:#b42318; border-bottom:1px dashed #b42318; cursor:help; }
+.no-nav a.tag-ref,.no-nav a.wikilink{ cursor:default; pointer-events:none; }
+.reader-tag{ cursor:pointer; transition:all .12s; }
+.reader-tag:hover{ background:#b8321f!important; color:#fff!important; border-color:#b8321f!important; }
+
+#tag-pop{ position:fixed; z-index:70; width:19rem; max-height:20rem; overflow:auto; background:#fff; border:1px solid var(--ink); border-radius:4px; box-shadow:0 18px 50px rgba(27,26,23,.2); font-family:Inter,sans-serif; }
+#tag-pop .tp-head{ display:flex; justify-content:space-between; align-items:center; padding:.5rem .8rem; font:600 .8rem 'Fira Code',monospace; color:#9c2a19; border-bottom:1px solid var(--rule); background:#fbfaf6; }
+#tag-pop .tp-x{ font-size:1.1rem; line-height:1; color:#6b665d; }
+#tag-pop .tp-item{ display:block; width:100%; text-align:left; padding:.5rem .8rem; border-bottom:1px solid var(--rule); }
+#tag-pop .tp-item:hover{ background:#f6f3ec; }
+#tag-pop .tp-item b{ display:block; font-size:.82rem; color:var(--ink); }
+#tag-pop .tp-item small{ display:block; font:.68rem 'Fira Code',monospace; color:#8a847a; margin-top:.1rem; }
+#tag-pop .tp-empty{ padding:.7rem .8rem; font-size:.78rem; color:#8a847a; }
+#tag-pop .tp-filter{ display:block; width:100%; text-align:left; padding:.5rem .8rem; font-size:.72rem; font-weight:600; color:#4a463f; background:#fbfaf6; }
+#tag-pop .tp-filter:hover{ color:var(--ink); background:#f3f0e8; }

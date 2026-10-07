@@ -185,6 +185,7 @@ async function loadData() {
   renderSidebarTagChips();
   renderFolderTreeNav();
   if (currentArticleId) displayArticle(currentArticleId);
+  routeFromHash();   // buka artikel dari URL #/a/<id> kalau ada
 }
 
 async function seedSampleData() {
@@ -1047,8 +1048,10 @@ function setupSteps(root){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAddVaultModal();});
 
 function renderMarkdownAndMath(targetElement, markdownContent) {
-  targetElement.innerHTML = marked.parse(markdownContent);
+  targetElement.innerHTML = marked.parse(preprocessMarkdown(markdownContent));   // extras.js: ::: callout + opsi fence
   targetElement.querySelectorAll('img').forEach(img => { img.loading = 'lazy'; img.decoding = 'async'; });
+
+  setupCallouts(targetElement);                       // > [!theorem] ... -> kotak (sebelum KaTeX agar judul bisa memuat rumus)
 
   if (window.renderMathInElement) {
     renderMathInElement(targetElement, {
@@ -1064,30 +1067,8 @@ function renderMarkdownAndMath(targetElement, markdownContent) {
   }
   setupInteractiveMath(targetElement);
   setupSteps(targetElement);
-
-  targetElement.querySelectorAll('pre code.language-python').forEach((block) => {
-    hljs.highlightElement(block);
-
-    const parentPre = block.parentElement;
-    const codeText = block.innerText;
-    const outputId = `py-out-${Math.random().toString(36).substring(2, 9)}`;
-
-    const execContainer = document.createElement('div');
-    execContainer.className = "mt-2 pt-2 border-t border-slate-800 flex flex-col space-y-2";
-    execContainer.innerHTML = `
-      <div class="flex justify-between items-center">
-        <span class="text-[10px] font-mono text-slate-500"><i class="fa-brands fa-python text-amber-500 mr-1"></i>Python WASM Engine</span>
-        <button onclick="executePythonCode(\`${escapeCodeForAttribute(codeText)}\`, '${outputId}')" class="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded text-[11px] font-semibold transition flex items-center space-x-1">
-          <i class="fa-solid fa-play text-[10px]"></i>
-          <span>Jalankan Python</span>
-        </button>
-      </div>
-      <div id="${outputId}" class="p-2.5 bg-slate-950 rounded-lg text-xs font-mono min-h-[30px] text-slate-300 overflow-x-auto">
-        <span class="text-slate-600 italic">[Klik 'Jalankan Python' untuk mengeksekusi kode di atas]</span>
-      </div>
-    `;
-    parentPre.appendChild(execContainer);
-  });
+  setupCodeBlocks(targetElement);                     // Python (jalankan + sembunyikan) & listing statis LaTeX/Julia/C++/JS
+  linkifyInline(targetElement, targetElement.id === 'reader-markdown');   // #tag dan [[artikel]]
 }
 
 function escapeCodeForAttribute(str) {
@@ -1113,8 +1094,11 @@ function displayArticle(articleId) {
   tagsContainer.innerHTML = '';
   if (article.tags) {
     article.tags.forEach(t => {
-      const span = document.createElement('span');
-      span.className = "text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700";
+      const span = document.createElement('button');
+      span.type = 'button';
+      span.title = 'Buka dokumen bertag #' + t;
+      span.onclick = () => openTagTarget(t, span);
+      span.className = "reader-tag text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-amber-400 border border-slate-700";
       span.textContent = `#${t}`;
       tagsContainer.appendChild(span);
     });
@@ -1126,6 +1110,8 @@ function displayArticle(articleId) {
 
   generateTOC(article.content);
   renderFolderTreeNav();
+  syncArticleHash(article.id);
+  applyPendingAnchor();
 }
 
 // Daftar isi dibangun dari heading hasil render (akurat: abaikan komentar '#' di blok kode, rumus ikut benar).
@@ -1180,6 +1166,9 @@ function insertSnippet(type) {
   } else if (type === 'python') {
     snippet = `\n\`\`\`python\nimport numpy as np\nimport matplotlib.pyplot as plt\n\nx = np.linspace(0, 10, 100)\nplt.plot(x, np.sin(x))\nplt.show()\n\`\`\`\n`;
   }
+
+  if (EXTRA_SNIPPETS[type]) snippet = EXTRA_SNIPPETS[type];
+  if (!snippet) return;
 
   textarea.value = textarea.value.substring(0, start) + snippet + textarea.value.substring(end);
   updateLivePreview();
