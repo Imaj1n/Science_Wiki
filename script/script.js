@@ -184,8 +184,13 @@ async function loadData() {
   renderVaultSelectOptions();
   renderSidebarTagChips();
   renderFolderTreeNav();
-  if (currentArticleId) displayArticle(currentArticleId);
-  routeFromHash();   // buka artikel dari URL #/a/<id> kalau ada
+  // HANYA buka artikel jika ada hash spesifik di URL (#/a/id)
+  if (window.location.hash && window.location.hash.startsWith('#/a/')) {
+    routeFromHash();
+  } else {
+    // Jika membuka domain utama (https://sciencewiki.vercel.app), tampilkan Grid Vaults (Halaman Depan)
+    showVaultsGrid();
+  }
 }
 
 async function seedSampleData() {
