@@ -1,0 +1,151 @@
+/* ==========================================================================
+   flow.css — gaya Diagram Alir Matematika (di-scope di bawah .flow)
+   Dihasilkan dari <style> file asal; selector halaman-tunggal (body, header, main, textarea, #pv,
+   mode gelap) dibuang. Variabel warna diturunkan dari :root asal ke .flow.
+   Ubah tampilan cukup lewat variabel di blok ".flow{...}" paling atas.
+   ========================================================================== */
+.flow{
+  --bg:#fffcfb;--pn:#fff;--fg:#1d2430;--mut:#5d6470;--bd:#ecd9d3;--ac:#e07b00;--ok:#1b9e77;
+  --cd:#fff0d9;--c2:#2b7bb9;--c3:#d94f3d;--co:#f9a08f;
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--fg);
+  max-width:none; width:100%; margin:1.8rem 0;
+}
+.flow,.flow *,.flow *::before,.flow *::after{box-sizing:border-box}
+/* cegah gaya artikel (.wiki-content) bocor ke dalam diagram */
+.wiki-content .flow table{width:auto;margin:0;border:0;border-radius:0;overflow:visible}
+.wiki-content .flow table.t{width:100%}
+.wiki-content .flow th,.wiki-content .flow td{background:none;font-family:ui-monospace,monospace;color:inherit;font-size:inherit;padding:2px 6px}
+.wiki-content .flow table.mx td{padding:1px 6px;border:0}
+.wiki-content .flow code{font-family:ui-monospace,monospace}
+.wiki-content .flow .nd code{background:none;color:var(--mut);padding:0}
+.wiki-content .flow summary{display:list-item}
+.flow input[type=range]{accent-color:var(--ac)}
+/* kotak yang lebih lebar dari kolom artikel tidak boleh memotong widget melayang */
+.flow{overflow:visible}
+
+.flow button,.flow select{font:inherit;color:var(--fg);background:var(--pn);border:1px solid var(--bd);border-radius:6px;padding:4px 10px;cursor:pointer}
+.flow button:hover{border-color:var(--ac)}
+.flow button.pri{background:var(--ac);border-color:var(--ac);color:#1b1300;font-weight:600}
+.flow button:focus-visible,.flow select:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.flow math{font-size:1.12em}
+.flow math[display="block"]{margin:.6em 0}
+.flow{margin:16px 0;border:1px solid var(--bd);border-radius:10px;background:var(--pn);padding:12px}
+.flow .fl{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.flow .cv{position:relative;padding:6px 100px 6px 6px}
+.flow .col{display:flex;flex-direction:column;align-items:center;gap:34px}
+.flow .nd{position:relative;min-width:150px;max-width:100%;padding:8px 14px;text-align:center;border:1.5px solid var(--bd);background:var(--bg);border-radius:8px;transition:background .2s,border-color .2s,box-shadow .2s}
+.flow .nd.start,.flow .nd.end{border-radius:99px}
+.flow .nd.cond{border-radius:50%/50%;padding:14px 30px;background:var(--cd)}
+.flow .nd.act{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 30%,transparent);background:color-mix(in srgb,var(--ac) 14%,var(--pn))}
+.flow .nd code{display:block;margin-top:3px;font:11px/1.4 ui-monospace,monospace;color:var(--mut);background:none;padding:0;word-break:break-all}
+.flow svg.ed{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.flow .e{fill:none;stroke:var(--mut);stroke-width:1.5}
+.flow .e.on{stroke:var(--ac);stroke-width:2.8}
+.flow svg.ed text{font:11px system-ui,sans-serif;fill:var(--mut)}
+.flow .side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.flow .ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.flow .ctl label{font-size:12px;color:var(--mut);display:flex;gap:4px;align-items:center}
+.flow .vars{display:flex;flex-wrap:wrap;gap:6px}
+.flow .chip{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid var(--bd);border-radius:6px;font:12px ui-monospace,monospace;background:var(--bg)}
+.flow .chip b{color:var(--mut);font-weight:600;margin-right:4px}
+.flow .chip.ch{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--bg))}
+.flow .chip.dn{color:var(--ok);border-color:var(--ok)}
+.flow canvas{width:100%;display:block;background:var(--bg);border:1px solid var(--bd);border-radius:8px}
+.flow .log{max-height:130px;overflow:auto;font:11.5px/1.55 ui-monospace,monospace;color:var(--mut);border-top:1px solid var(--bd);padding-top:6px}
+.flow .mx{border-collapse:separate;border-spacing:2px;border-left:2px solid var(--fg);border-right:2px solid var(--fg);border-radius:4px;font:11.5px ui-monospace,monospace}
+.flow .mx td{padding:1px 6px;text-align:right;border-radius:3px}
+.flow .nd{cursor:pointer}
+.flow .nd.sel{outline:2px dashed var(--ac);outline-offset:3px}
+.flow .dt{border:1px solid var(--bd);border-radius:8px;padding:8px;background:var(--bg)}
+.flow .dh{display:flex;gap:8px;align-items:center}
+.flow .dh button{margin-left:auto;padding:0 8px}
+.flow .tw{max-height:190px;overflow:auto;margin:6px 0}
+.flow table.t{width:100%;border-collapse:collapse;font:11.5px ui-monospace,monospace}
+.flow .t th,.flow .t td{padding:2px 6px;border-bottom:1px solid var(--bd);text-align:right}
+.flow .mu{color:var(--mut);font-size:12px}
+.flow .sb{font-size:.92em;margin-top:3px}
+.flow .sb:empty{display:none}
+.flow .prm,.flow .vw{display:flex;flex-wrap:wrap;gap:8px 14px}
+.flow .vw{flex-direction:column;flex-wrap:nowrap}
+.flow .pl,.flow .ck{display:flex;gap:6px;align-items:center;font:12px ui-monospace,monospace;color:var(--mut)}
+.flow .pl output{min-width:4ch;color:var(--fg)}
+.flow .err{color:#d23f3f;padding:8px}
+.flow .scr{color:var(--ac);background:color-mix(in srgb,var(--ac) 16%,transparent);border-radius:3px;padding:0 2px;cursor:ew-resize;touch-action:none;user-select:none}
+.flow .scr:hover,.flow .scr:focus-visible{background:color-mix(in srgb,var(--ac) 34%,transparent);outline:none}
+.flow .wi{border:1px solid var(--ac);border-radius:8px;padding:8px;background:var(--bg);display:flex;flex-direction:column;gap:6px}
+.flow .wi[hidden]{display:none}
+.flow .nd.hov{outline:2px solid var(--ok);outline-offset:3px}
+.flow .tip{position:fixed;z-index:99999;pointer-events:none;background:var(--pn);border:1px solid var(--bd);border-radius:6px;padding:4px 8px;font:11.5px/1.5 ui-monospace,monospace;box-shadow:0 4px 14px #0003}
+.flow .cx{font-size:12.5px;padding:2px 2px 0}
+.flow .err button{margin-left:8px}
+.flow{padding:22px;border-radius:20px;box-shadow:0 6px 0 var(--bd)}
+.flow .fl{grid-template-columns:minmax(300px,.95fr) minmax(320px,1.05fr);gap:28px;align-items:start}
+.flow .side{position:sticky;top:8px;max-height:calc(100vh - 80px);overflow:auto;padding:2px 6px 8px 2px}
+/* layout sempit: dipicu JS (lebar kotak .flow < 900px), bukan lebar layar */
+.flow.narrow .fl{grid-template-columns:1fr}
+.flow.narrow .side{position:static;max-height:none}
+.flow canvas{border:0;background:var(--pn);border-radius:12px;box-shadow:inset 0 0 0 1px var(--bd)}
+.flow .col{gap:46px}
+.flow .nd{--nc:var(--bd);min-width:240px;padding:20px 24px 16px;font-size:15px;border:2.5px solid var(--nc);border-radius:20px;background:color-mix(in srgb,var(--nc) 10%,var(--pn));box-shadow:0 5px 0 var(--nc);transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .2s,background .2s}
+.flow .nd:hover{transform:translateY(-3px) rotate(-.5deg);box-shadow:0 8px 0 var(--nc)}
+.flow .nd.start{--nc:#2bb673}
+.flow .nd.proc{--nc:#3b82f6}
+.flow .nd.cond{--nc:#f5a524;border-radius:28px;padding:20px 26px 16px;background:color-mix(in srgb,var(--nc) 12%,var(--pn))}
+.flow .nd.end{--nc:#ef5da8}
+.flow .nd.start,.flow .nd.end{border-radius:28px}
+.flow .nd.act{border-color:var(--nc);background:color-mix(in srgb,var(--nc) 22%,var(--pn));box-shadow:0 5px 0 var(--nc),0 0 0 7px color-mix(in srgb,var(--nc) 28%,transparent);animation:flowpop .45s cubic-bezier(.34,1.56,.64,1)}
+@keyframes flowpop{0%{transform:scale(.94)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+.flow .tp{position:absolute;top:-14px;left:16px;background:var(--nc);color:#fff;font:700 11px/1 system-ui;padding:5px 10px;border-radius:99px;box-shadow:0 2px 0 #0003;letter-spacing:.02em}
+.flow .lb{font-size:1.2em}
+.flow .lb math{font-size:1.2em}
+.flow .rc{display:flex;flex-direction:column;gap:6px;margin-top:10px;text-align:left}
+.flow .rc:empty{display:none}
+.flow .st{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;background:var(--pn);border:1.5px dashed color-mix(in srgb,var(--nc) 55%,transparent);border-radius:12px;padding:6px 10px;font:13px/1.7 system-ui}
+.flow .st .vb{color:var(--mut);font-size:12px}
+.flow .vr{background:color-mix(in srgb,var(--nc) 20%,transparent);border-radius:6px;padding:0 6px;font:700 13px ui-monospace,monospace}
+.flow .ar{color:var(--nc);font-weight:800}
+.flow .ex{font:13px ui-monospace,monospace;overflow-wrap:anywhere}
+.flow .ex .fn{color:var(--c2)}
+.flow .ex .nm{color:var(--c3)}
+.flow details.raw summary{cursor:pointer;font-size:11px;color:var(--mut);margin-top:2px}
+.flow .xp{display:flex;flex-direction:column;gap:8px}
+.flow .xl{display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding:4px}
+.flow .xs{display:grid;grid-template-columns:26px 1fr;gap:2px 10px;padding:10px 12px;border:2px solid var(--bd);border-radius:16px;background:var(--pn);opacity:.55;cursor:pointer;transition:opacity .25s}
+.flow .xs.cur{opacity:1;border-color:var(--ac);box-shadow:0 4px 0 var(--ac);animation:flowpop .4s cubic-bezier(.34,1.56,.64,1)}
+.flow .xn{grid-row:span 2;width:24px;height:24px;border-radius:50%;background:var(--ac);color:#1b1300;font:700 12px/24px system-ui;text-align:center}
+.flow .xt{font-size:1.35em;overflow-x:auto}
+.flow .xd{color:var(--mut)}
+.flow.xm .side>:not(.xp):not(.c1){display:none}
+.flow.xm .c1>:not(select){display:none}
+.flow.xm .sb{display:none}
+.flow.xm .scr{background:none;color:inherit;cursor:default;pointer-events:none}
+.flow button.pri,.flow .dock button.on{background:var(--co);color:#1b1300;border-color:var(--fg)}
+.flow button{border-radius:5px}
+.flow canvas{--mut:#6b564f;--fg:#273340;--pn:#fff4ec;--grid:#e8b894;--ac:#ff9800;background:#fbd7bd;border-radius:12px;box-shadow:inset 0 0 0 1px #f0c3a3}
+.flow .fl{grid-template-columns:minmax(240px,.95fr) var(--dgw,0px) minmax(240px,1fr);column-gap:0;row-gap:16px}
+.flow .side{padding-left:24px}
+.flow .dg{position:relative;align-self:stretch;min-width:0}
+.flow .dt{position:absolute;left:14px;right:0;z-index:5;background:var(--pn);border:2px solid var(--fg);border-radius:14px;padding:10px 12px;box-shadow:5px 5px 0 var(--co);display:block}
+.flow .dt[hidden]{display:none}
+.flow .dt::before{content:"";position:absolute;left:-10px;top:16px;width:16px;height:16px;background:var(--pn);border-left:2px solid var(--fg);border-bottom:2px solid var(--fg);transform:rotate(45deg)}
+.flow .dt .tw{max-height:190px;overflow:auto}
+/* layout sempit: dipicu JS (lebar kotak .flow < 900px), bukan lebar layar */
+.flow.narrow .fl{grid-template-columns:1fr}
+.flow.narrow .dg{align-self:start}
+.flow.narrow .dt{position:static;margin:6px 0}
+.flow.narrow .dt::before{display:none}
+.flow.narrow .side{padding-left:0}
+.flow .vw:empty{display:none}
+.flow .dock{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.flow .wd{position:fixed;z-index:40;width:420px;height:310px;min-width:260px;min-height:190px;resize:both;overflow:hidden;display:flex;flex-direction:column;background:var(--pn);border:1.5px solid var(--fg);border-radius:14px;box-shadow:6px 6px 0 var(--co),0 14px 40px #0003}
+.flow .wd[hidden]{display:none}
+.flow .wh{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--co);color:#1b1300;cursor:grab;user-select:none;touch-action:none}
+.flow .wh b{flex:1;font-size:13px;text-transform:uppercase;letter-spacing:.03em}
+.flow .wh button{padding:0 7px;background:#fff8;border-color:#1b1300}
+.flow .wb{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding:8px}
+.flow .wb canvas{flex:1 1 0;height:0;min-height:0;width:100%}
+.flow .wb>.ctl,.flow .wb>.cx{flex:none}
+.flow .wd{box-shadow:0 2px 4px #0003,0 10px 22px #0003,0 28px 64px #0005,8px 8px 0 var(--co)}
+.flow.xm .rc{display:none}
+.flow .xt{padding:4px 0;overflow-x:auto;overflow-y:hidden}
+.flow .xl{scroll-behavior:smooth}

@@ -71,7 +71,7 @@ const CODE_LANGS = {
   text:   { label: 'Teks',       icon: 'fa-regular fa-file-lines', hl: null },
   txt:    { label: 'Teks',       icon: 'fa-regular fa-file-lines', hl: null },
 };
-const NON_CODE_FENCES = new Set(['graph', 'steps']);   // sudah ditangani modul lain
+const NON_CODE_FENCES = new Set(['graph', 'steps', 'flow', 'glossary']);   // ditangani modul lain (flow-engine.js, glossary.js)
 
 /* ==========================================================================
    1. PREPROCESSOR MARKDOWN
@@ -351,7 +351,7 @@ function knownTagSet() {
 
 function linkifyInline(root, interactive = true) {
   const tags = knownTagSet();
-  const SKIP = 'pre, code, a, .katex, .katex-display, script, style, textarea, .mp-fig, .st-fig, .cb-head, h1, h2, h3, .tag-ref, .wikilink';
+  const SKIP = 'pre, code, a, .katex, .katex-display, script, style, textarea, .mp-fig, .st-fig, .cb-head, h1, h2, h3, .tag-ref, .wikilink, .flow, .gl-list, .term-ref';
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(n) {
       if (!n.nodeValue || (n.nodeValue.indexOf('#') < 0 && n.nodeValue.indexOf('[[') < 0)) return NodeFilter.FILTER_REJECT;
@@ -512,7 +512,7 @@ window.addEventListener('popstate', () => {
 /* ==========================================================================
    5. PENGATURAN TAMPILAN  (lebar konten, margin samping, ukuran teks, kode)
    ========================================================================== */
-const VIEW_DEFAULTS = { readMax: 1360, sidePad: 20, fontScale: 1, hideCode: false };
+const VIEW_DEFAULTS = { readMax: 1360, sidePad: 20, fontScale: 1, hideCode: false, glossary: true };
 const VIEW_FULL = 2200;            // geser slider sampai ujung = lebar penuh
 let viewSettings = { ...VIEW_DEFAULTS };
 
@@ -529,10 +529,11 @@ function applyViewSettings() {
   root.setProperty('--side-pad', s.sidePad + 'px');
   root.setProperty('--fs-scale', String(s.fontScale));
   document.body.classList.toggle('code-all-hidden', !!s.hideCode);
+  document.body.classList.toggle('gloss-off', !s.glossary);
 
   const set = (id, v) => { const el = document.getElementById(id); if (el) { if (el.type === 'checkbox') el.checked = !!v; else el.value = v; } };
   const txt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('vs-width', s.readMax); set('vs-pad', s.sidePad); set('vs-font', Math.round(s.fontScale * 100)); set('vs-hidecode', s.hideCode);
+  set('vs-width', s.readMax); set('vs-pad', s.sidePad); set('vs-font', Math.round(s.fontScale * 100)); set('vs-hidecode', s.hideCode); set('vs-glossary', s.glossary);
   txt('vs-width-val', full ? 'Penuh' : s.readMax + ' px');
   txt('vs-pad-val', s.sidePad + ' px');
   txt('vs-font-val', Math.round(s.fontScale * 100) + '%');
@@ -546,6 +547,7 @@ function initViewSettings() {
   bind('vs-pad',    el => viewSettings.sidePad = +el.value);
   bind('vs-font',   el => viewSettings.fontScale = +el.value / 100);
   bind('vs-hidecode', el => { viewSettings.hideCode = el.checked; setAllCodeHidden(el.checked); });
+  bind('vs-glossary', el => viewSettings.glossary = el.checked);
   const reset = document.getElementById('vs-reset');
   if (reset) reset.addEventListener('click', () => { viewSettings = { ...VIEW_DEFAULTS }; applyViewSettings(); setAllCodeHidden(false); saveViewSettings(); });
   document.addEventListener('pointerdown', e => {
@@ -579,6 +581,9 @@ const EXTRA_SNIPPETS = {
   'k-julia':    '\n```julia title="contoh.jl"\nf(x) = x^2 + 1\nprintln(f(3))\n```\n',
   'k-cpp':      '\n```cpp title="main.cpp"\n#include <iostream>\nint main() {\n    std::cout << "Halo\\n";\n    return 0;\n}\n```\n',
   'k-js':       '\n```js title="contoh.js"\nconst f = x => x ** 2 + 1;\nconsole.log(f(3));\n```\n',
+  'k-flow':     '\n```flow\nn0 [start] Mulai\nn1 [proc] $x_0=1$ | x = 1; k = 0\nn2 [proc] $x \\leftarrow x+1$ | x = x + 1; k = k + 1\nn3 [cond] $k\\ge 5\\ ?$ | k >= 5 ? n4 : n2\nn4 [end] Selesai\nplot: x\n```\n',
+  'k-glossary': '\n```glossary\n# istilah | alias\nDefinisi dengan rumus $E=mc^2$ dan [tautan](https://example.org).\n```\n',
+  'ref-term':   '{{istilah}}',
   'ref-wiki':   '[[id-artikel|teks tampilan]]',
   'ref-tag':    '#nama-tag',
 };

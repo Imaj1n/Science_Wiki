@@ -133,3 +133,10 @@ details.callout[open] .callout-chev{ transform:rotate(180deg); }
 #tag-pop .tp-empty{ padding:.7rem .8rem; font-size:.78rem; color:#8a847a; }
 #tag-pop .tp-filter{ display:block; width:100%; text-align:left; padding:.5rem .8rem; font-size:.72rem; font-weight:600; color:#4a463f; background:#fbfaf6; }
 #tag-pop .tp-filter:hover{ color:var(--ink); background:#f3f0e8; }
+
+/* ---------- perbaikan: widget melayang diagram alir (position:fixed) ----------
+   .tab-content memakai animation "rise ... both" (ada transform di keyframe). Dengan fill-mode "both"
+   elemen tetap dianggap punya transform setelah animasi selesai, sehingga position:fixed di dalamnya
+   ikut bergeser/ter-scroll bersama konten. "backwards" menghilangkan efek itu setelah animasi selesai. */
+
+/* .tab-content{ animation-fill-mode:backwards; } */

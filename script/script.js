@@ -184,12 +184,11 @@ async function loadData() {
   renderVaultSelectOptions();
   renderSidebarTagChips();
   renderFolderTreeNav();
-  // HANYA buka artikel jika ada hash spesifik di URL (#/a/id)
+  // Hanya buka artikel spesifik JIKA ada hash di URL
   if (window.location.hash && window.location.hash.startsWith('#/a/')) {
     routeFromHash();
   } else {
-    // Jika membuka domain utama (https://sciencewiki.vercel.app), tampilkan Grid Vaults (Halaman Depan)
-    showVaultsGrid();
+    showVaultsGrid(); // Tampilkan halaman depan (Grid Vaults)
   }
 }
 
@@ -1072,8 +1071,10 @@ function renderMarkdownAndMath(targetElement, markdownContent) {
   }
   setupInteractiveMath(targetElement);
   setupSteps(targetElement);
+  setupFlowDiagrams(targetElement);                   // flow-engine.js: ```flow -> diagram alir interaktif
   setupCodeBlocks(targetElement);                     // Python (jalankan + sembunyikan) & listing statis LaTeX/Julia/C++/JS
   linkifyInline(targetElement, targetElement.id === 'reader-markdown');   // #tag dan [[artikel]]
+  setupGlossary(targetElement);                       // glossary.js: istilah asing + widget hover
 }
 
 function escapeCodeForAttribute(str) {

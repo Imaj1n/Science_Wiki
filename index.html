@@ -162,6 +162,8 @@
     body.is-admin .non-admin-only{display:none!important}
   </style>
   <link rel="stylesheet" href="style/features.css">
+  <link rel="stylesheet" href="style/flow.css">
+  <link rel="stylesheet" href="style/glossary.css">
 </head>
 
 <body class="h-full bg-vaultDark text-slate-100 font-sans antialiased flex flex-col">
@@ -427,12 +429,13 @@
             <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan listing kode" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
               <option value="">Kode ▾</option>
               <option value="k-python-hide">Python (tersembunyi)</option>
+              <option value="k-flow">Diagram alir (flow)</option><option value="k-glossary">Blok glosarium</option>
               <option value="k-latex">LaTeX</option><option value="k-julia">Julia</option>
               <option value="k-cpp">C++</option><option value="k-js">JavaScript</option>
             </select>
             <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan link/tag inline" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
               <option value="">Link ▾</option>
-              <option value="ref-wiki">[[Link artikel]]</option><option value="ref-tag">#tag inline</option>
+              <option value="ref-wiki">[[Link artikel]]</option><option value="ref-tag">#tag inline</option><option value="ref-term">{{istilah}}</option>
             </select>
             <span class="text-[10px] text-slate-500 ml-auto hidden sm:inline"><i class="fa-regular fa-paste mr-1"></i>Bisa Paste Gambar (Ctrl+V)</span>
           </div>
@@ -486,6 +489,7 @@
     <div class="vs-row"><label for="vs-font">Ukuran teks <span id="vs-font-val"></span></label>
       <input type="range" id="vs-font" min="80" max="140" step="5"></div>
     <label class="vs-check"><input type="checkbox" id="vs-hidecode"> Sembunyikan semua kode</label>
+    <label class="vs-check" style="margin-top:.4rem"><input type="checkbox" id="vs-glossary"> Sorot istilah glosarium</label>
     <button type="button" id="vs-reset" class="vs-reset">Reset</button>
     <p class="vs-hint">Geser lebar konten ke ujung kanan untuk lebar penuh. Pengaturan tersimpan di browser ini.</p>
   </div>
@@ -595,6 +599,8 @@
     </div>
     </div>
 <script src="script/extras.js"></script>
+<script src="script/flow-engine.js"></script>
+<script src="script/glossary.js"></script>
 <script src="script/script.js"></script>
 </body>
 </html>
