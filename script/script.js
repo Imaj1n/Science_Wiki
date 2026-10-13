@@ -1052,7 +1052,10 @@ function setupSteps(root){
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAddVaultModal();});
 
 function renderMarkdownAndMath(targetElement, markdownContent) {
-  targetElement.innerHTML = marked.parse(preprocessMarkdown(markdownContent));   // extras.js: ::: callout + opsi fence
+  const pre = preprocessMarkdown(markdownContent);                                 // extras.js: ::: callout + opsi fence
+  const isPreview = targetElement.id === 'editor-live-preview';
+  if (isPreview) renderWithSourceLines(targetElement, pre, preprocessMarkdown.lastMap);   // + data-src-line utk sinkron scroll
+  else targetElement.innerHTML = marked.parse(pre);
   targetElement.querySelectorAll('img').forEach(img => { img.loading = 'lazy'; img.decoding = 'async'; });
 
   setupCallouts(targetElement);                       // > [!theorem] ... -> kotak (sebelum KaTeX agar judul bisa memuat rumus)
@@ -1066,15 +1069,37 @@ function renderMarkdownAndMath(targetElement, markdownContent) {
         {left: '\\[', right: '\\]', display: true}
       ],
       throwOnError: false,
-      trust: true
+      trust: true,
+      macros: Object.assign({}, TW_KATEX_MACROS)
     });
   }
+  setupReactiveMath(targetElement);                   // \var \sym \fn \val \calc: variabel reaktif di dalam rumus
   setupInteractiveMath(targetElement);
   setupSteps(targetElement);
   setupFlowDiagrams(targetElement);                   // flow-engine.js: ```flow -> diagram alir interaktif
   setupCodeBlocks(targetElement);                     // Python (jalankan + sembunyikan) & listing statis LaTeX/Julia/C++/JS
   linkifyInline(targetElement, targetElement.id === 'reader-markdown');   // #tag dan [[artikel]]
   setupGlossary(targetElement);                       // glossary.js: istilah asing + widget hover
+  if (isPreview) retagSourceLines(targetElement);     // beberapa setup mengganti elemen -> tandai ulang berdasarkan indeks
+}
+
+// Peta baris sumber -> blok hasil render (top-level). Dipakai sinkron scroll editor <-> pratinjau.
+function renderWithSourceLines(el, pre, lineMap) {
+  let tokens = null;
+  try { tokens = marked.lexer(pre); el.innerHTML = marked.parser(tokens); }
+  catch (_) { tokens = null; el.innerHTML = marked.parse(pre); }
+  el._srcLines = null;
+  if (!tokens) return;
+  const starts = []; let nl = 0;
+  tokens.forEach(t => { if (t.type !== 'space' && t.type !== 'def') starts.push(nl); nl += ((t.raw || '').match(/\n/g) || []).length; });
+  if (starts.length !== el.children.length) return;          // tidak 1:1 dengan elemen -> sinkron proporsional saja
+  const toSrc = n => (lineMap && lineMap.length ? lineMap[Math.min(n, lineMap.length - 1)] : n);   // koordinat teks asli (sebelum ::: diolah)
+  el._srcLines = starts.map(toSrc);
+  Array.from(el.children).forEach((k, i) => { k.dataset.srcLine = el._srcLines[i]; });
+}
+function retagSourceLines(el) {
+  if (el._srcLines && el._srcLines.length === el.children.length)
+    Array.from(el.children).forEach((k, i) => { k.dataset.srcLine = el._srcLines[i]; });
 }
 
 function escapeCodeForAttribute(str) {
@@ -1112,6 +1137,7 @@ function displayArticle(articleId) {
 
   const readerEl = document.getElementById('reader-markdown');
   readerEl._mpMem = {};
+  readerEl._rxMem = {};
   renderMarkdownAndMath(readerEl, article.content);
 
   generateTOC(article.content);
@@ -1167,6 +1193,8 @@ function insertSnippet(type) {
     snippet = `\n$$ G_{\\mu\\nu} + \\Lambda g_{\\mu\\nu} = \\frac{8\\pi G}{c^4} T_{\\mu\\nu} $$\n`;
   } else if (type === 'graph') {
     snippet = `\n$$f(x) = \\htmlData{param=a}{a}\\, x^2$$\n\n\`\`\`graph\na = 1 [-3, 3]\nf(x) = a*x^2\n\`\`\`\n`;
+  } else if (type === 'reactive') {
+    snippet = `\n$$\\fn{f(x) = x^{2}}$$\n\nDengan $x = \\var{x = 3 [-10, 10]}$ maka $f(\\var{x}) = \\val{f(x)}$.\n\nHasilnya bisa dipakai di rumus lain: $y = \\calc{y = f(x) + 1}$, sehingga $y^{2} = \\val{y^{2}}$.\n`;
   } else if (type === 'steps') {
     snippet = `\n\`\`\`steps\ntitle: Contoh slide rumus\nax^2+bx+c=0 | Persamaan awal\nx^2+\\frac{b}{a}x+\\frac{c}{a}=0 | Bagi kedua ruas dengan a\nx=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}\n\`\`\`\n`;
   } else if (type === 'python') {
@@ -1180,11 +1208,467 @@ function insertSnippet(type) {
   updateLivePreview();
 }
 
+/* ===== RENDER MANUAL (seperti tombol Compile di Overleaf) =====
+   Mengetik tidak lagi memicu render (marked + KaTeX + graph + steps + flow + glosarium
+   untuk SELURUH dokumen) di setiap tombol. Render dijalankan lewat tombol Render,
+   Ctrl/Cmd+Enter, atau (opsional) Auto-render dengan debounce. */
+let editorAutoTimer = null;
+const EDITOR_AUTO_DELAY = 900;
+
+function editorAutoOn() { try { return localStorage.getItem('tw-autorender') === '1'; } catch (_) { return false; } }
+
+function setEditorStatus(state) {   // 'dirty' | 'clean' | 'busy'
+  const st = document.getElementById('editor-render-status');
+  const btn = document.getElementById('editor-render-btn');
+  if (!st || !btn) return;
+  st.classList.toggle('dirty', state === 'dirty');
+  st.textContent = state === 'dirty' ? 'Belum dirender' : state === 'busy' ? 'Merender…' : 'Tersinkron';
+  btn.disabled = state === 'busy';
+  btn.classList.toggle('opacity-60', state === 'busy');
+}
+
+function onEditorInput() {
+  setEditorStatus('dirty');
+  if (editorAutoOn()) {
+    clearTimeout(editorAutoTimer);
+    editorAutoTimer = setTimeout(renderEditorNow, EDITOR_AUTO_DELAY);
+  }
+}
+
+function renderEditorNow() {
+  clearTimeout(editorAutoTimer);
+  setEditorStatus('busy');
+  // beri browser satu frame untuk menampilkan status "Merender…" sebelum thread tersita
+  requestAnimationFrame(() => setTimeout(updateLivePreview, 0));
+}
+
+function setEditorAuto(on) {
+  try { localStorage.setItem('tw-autorender', on ? '1' : '0'); } catch (_) {}
+  if (on && document.getElementById('editor-render-status')?.classList.contains('dirty')) renderEditorNow();
+}
+
+function initEditorRender() {
+  const ta = document.getElementById('editor-content');
+  const cb = document.getElementById('editor-autorender');
+  if (cb) cb.checked = editorAutoOn();
+  if (ta) ta.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); renderEditorNow(); }
+  });
+  initEditorSync();
+}
+
+// Render langsung (sinkron). Dipakai tombol Render, buka editor, sisip snippet, dll.
 function updateLivePreview() {
   const inputContent = document.getElementById('editor-content').value;
   const previewContainer = document.getElementById('editor-live-preview');
-  renderMarkdownAndMath(previewContainer, inputContent);
+  const keepScroll = previewContainer.scrollTop;
+  try {
+    renderMarkdownAndMath(previewContainer, inputContent);
+  } finally {
+    // setelah render: ikuti posisi editor (jika ada peta baris), kalau tidak pertahankan scroll lama
+    const canSync = EdSync.driver !== 'pv' && edSyncOn() && edSideBySide() && previewContainer.querySelector(':scope > [data-src-line]');
+    if (canSync) { EdSync.dirty = true; edSyncToPreview(); } else previewContainer.scrollTop = keepScroll;
+    setEditorStatus('clean');
+  }
 }
+
+/* ===== VARIABEL REAKTIF DI DALAM RUMUS (gaya Observable / Pluto) =====
+   Semua perintah ditulis DI DALAM rumus ($...$ atau $$...$$). Definisi boleh di mana saja; urutan tidak penting.
+
+     \var{x = 3 [-10, 10]}     definisikan variabel x (nilai awal 3, rentang opsional [min, maks, langkah]) dan tampilkan
+                                angkanya sebagai angka yang bisa di-drag
+     \var{x}                    tampilkan angka x yang bisa di-drag (di rumus/paragraf lain; semuanya ikut berubah)
+     \sym{x}                    tampilkan HURUF x yang bisa di-drag (tooltip menunjukkan nilainya)
+     \fn{f(x) = x^2}            definisikan fungsi f; rumusnya ditampilkan apa adanya
+     \val{f(x)}                 tampilkan hasil hitung ekspresi (ikut berubah saat variabel di-drag)
+     \valn{f(x)}{2}             sama, dibulatkan 2 desimal
+     \calc{y = f(x) + 1}        hitung, simpan sebagai y (bisa dipakai di \val / \fn / \calc lain), dan tampilkan nilainya
+
+   Ekspresi memakai sintaks mathjs; beberapa LaTeX dikonversi otomatis (\cdot \times \frac \sqrt ^{ } \pi \sin ...).
+   Hindari tanda * di dalam $...$ (dibaca markdown sebagai cetak miring) -> pakai \cdot atau spasi.
+   Klik dua kali pada angka = kembali ke nilai awal. */
+const TW_KATEX_MACROS = {
+  // render pertama (auto-render) hanya perlu tidak error; setupReactiveMath lalu merender ulang dengan nilai sebenarnya
+  '\\var': '#1', '\\sym': '#1', '\\fn': '#1', '\\calc': '#1', '\\val': '#1', '\\valn': '#1\\;#2',
+  '\\rxv': '\\htmlData{svid=#1}{#2}',     // angka/huruf yang bisa di-drag (id = urutan perintah di rumus itu)
+  '\\rxc': '\\htmlClass{#1}{#2}'          // hasil hitung (tidak bisa di-drag)
+};
+const RX_CMDS = { var: 1, sym: 1, fn: 1, calc: 1, val: 1, valn: 2 };
+const RX_ERR = '\\htmlClass{rx-err}{?}';
+
+/* --- parser kecil: cari perintah \var{..} dst. dengan kurung kurawal seimbang --- */
+function rxGroup(s, i) {                       // s[i] === '{' -> [isi, indeks setelah '}'] atau null
+  let d = 0;
+  for (let j = i; j < s.length; j++) {
+    const c = s[j];
+    if (c === '\\') { j++; continue; }
+    if (c === '{') d++;
+    else if (c === '}') { d--; if (d === 0) return [s.slice(i + 1, j), j + 1]; }
+  }
+  return null;
+}
+function rxScan(tex) {
+  const out = [], re = /[A-Za-z]+/y;
+  for (let i = 0; i < tex.length; i++) {
+    if (tex[i] !== '\\') continue;
+    re.lastIndex = i + 1;
+    const m = re.exec(tex);
+    if (!m) { i++; continue; }
+    const name = m[0], n = RX_CMDS[name];
+    if (!n) { i += name.length; continue; }
+    let j = i + 1 + name.length, ok = true; const args = [];
+    for (let a = 0; a < n; a++) {
+      while (tex[j] === ' ') j++;
+      const g = tex[j] === '{' ? rxGroup(tex, j) : null;
+      if (!g) { ok = false; break; }
+      args.push(g[0]); j = g[1];
+    }
+    if (ok) { out.push({ name, args, start: i, end: j }); i = j - 1; } else i += name.length;
+  }
+  return out;
+}
+
+/* --- LaTeX -> ekspresi mathjs (secukupnya) --- */
+function rxExpr(t) {
+  let s = String(t).replace(/\\(?:left|right|displaystyle|quad|qquad)\b/g, '').replace(/\\[,;:! ]/g, ' ').replace(/−/g, '-');
+  for (let g = 0; g < 60; g++) {
+    const m = /\\[dt]?frac\s*(?=\{)/.exec(s); if (!m) break;
+    const a = rxGroup(s, m.index + m[0].length); if (!a) break;
+    const b = s[a[1]] === '{' ? rxGroup(s, a[1]) : null; if (!b) break;
+    s = s.slice(0, m.index) + '((' + rxExpr(a[0]) + ')/(' + rxExpr(b[0]) + '))' + s.slice(b[1]);
+  }
+  for (let g = 0; g < 60; g++) {
+    const m = /\\sqrt\s*(?:\[([^\]]*)\])?\s*(?=\{)/.exec(s); if (!m) break;
+    const a = rxGroup(s, m.index + m[0].length); if (!a) break;
+    const inner = rxExpr(a[0]);
+    s = s.slice(0, m.index) + (m[1] ? 'nthRoot((' + inner + '),(' + rxExpr(m[1]) + '))' : 'sqrt(' + inner + ')') + s.slice(a[1]);
+  }
+  s = s.replace(/\\(?:cdot|times)\b/g, '*').replace(/\\div\b/g, '/').replace(/\\pi\b/g, 'pi')
+       .replace(/\\ln\b/g, 'log').replace(/\\log\b/g, 'log10')
+       .replace(/\\arc(sin|cos|tan)h?\b/g, 'a$1')
+       .replace(/_\{([^{}]*)\}/g, (m, a) => '_' + a.replace(/[^A-Za-z0-9]/g, ''))
+       .replace(/\{/g, '(').replace(/\}/g, ')')
+       .replace(/\\([A-Za-z]+)/g, '$1');
+  return s.trim();
+}
+const rxId = s => String(s).replace(/^\\/, '');
+const rxDec = v => (String(v).split('.')[1] || '').replace(/[eE].*$/, '').length;
+
+function rxParseVar(raw) {
+  const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*(?:=\s*(-?\d*\.?\d+(?:[eE][-+]?\d+)?)\s*(?:\[\s*([^\]]*?)\s*\])?)?\s*$/.exec(raw);
+  if (!m) return null;
+  const d = { name: rxId(m[1]), tex: m[1], decl: m[2] !== undefined };
+  if (d.decl) {
+    d.defStr = m[2]; d.def = parseFloat(m[2]);
+    const p = (m[3] || '').split(',').map(x => parseFloat(x));
+    d.min = p[0]; d.max = p[1]; d.step = p[2];
+  }
+  return d;
+}
+function rxParseFn(raw) {
+  const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*=\s*([\s\S]+)$/.exec(String(raw).replace(/\\(?:left|right)\b/g, ''));
+  if (!m) return null;
+  return { name: rxId(m[1]), params: m[2].split(',').map(p => rxId(p.trim())).filter(Boolean), expr: rxExpr(m[3]) };
+}
+function rxParseCalc(raw) {
+  const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*=\s*([\s\S]+)$/.exec(raw);
+  return m ? { name: rxId(m[1]), expr: rxExpr(m[2]) } : null;
+}
+function rxMakeVar(d, mem) {
+  const def = d.def;
+  const step = d.step > 0 ? d.step : Math.pow(10, -rxDec(d.defStr));
+  const dec = Math.max(rxDec(step), rxDec(d.defStr));
+  const span = Math.max(10 * step, Math.abs(def) * 3);
+  let min = isFinite(d.min) ? d.min : Math.floor(-span / step) * step;
+  let max = isFinite(d.max) ? d.max : Math.ceil(span / step) * step;
+  if (min > max) [min, max] = [max, min];
+  const V = { name: d.name, def, min, max, step, dec, val: Math.min(max, Math.max(min, def)) };
+  const k = mem[d.name];
+  if (k && k.def === def) V.val = Math.min(max, Math.max(min, k.val));   // pulihkan nilai yang sudah digeser
+  return V;
+}
+
+/* --- evaluator: mathjs dengan fungsi berbahaya dimatikan (isi wiki bisa berasal dari usulan pengguna) --- */
+let _rxM = null;
+function rxCompile(expr) {
+  if (!_rxM) {
+    _rxM = { compile: math.compile.bind(math) };
+    try {
+      const lm = math.create(math.all), c = lm.compile.bind(lm), off = () => { throw new Error('dinonaktifkan'); };
+      lm.import({ import: off, createUnit: off, evaluate: off, parse: off, simplify: off, derivative: off }, { override: true });
+      if (c('1+1').evaluate({}) === 2) _rxM = { compile: c };
+    } catch (_) {}
+  }
+  return _rxM.compile(expr);
+}
+function rxEv(R, expr, scope) {
+  if (expr.length > 400) throw new Error('terlalu panjang');
+  let c = R.cache.get(expr);
+  if (!c) { c = rxCompile(expr); R.cache.set(expr, c); }
+  return c.evaluate(scope);
+}
+function rxEval(R) {
+  const sc = {};
+  for (const n in R.vars) sc[n] = R.vars[n].val;
+  R.fns.forEach(f => {
+    sc[f.name] = (...a) => { const loc = Object.assign({}, sc); f.params.forEach((p, i) => { loc[p] = a[i]; }); return rxEv(R, f.expr, loc); };
+  });
+  let pend = R.calcs.slice();                        // \calc boleh saling merujuk, urutan bebas
+  while (pend.length) {
+    const nx = [];
+    pend.forEach(c => { try { const v = rxEv(R, c.expr, sc); if (typeof v === 'number') sc[c.name] = v; else nx.push(c); } catch (_) { nx.push(c); } });
+    if (nx.length === pend.length) break;
+    pend = nx;
+  }
+  R.scope = sc; R.failed = new Set(pend.map(c => c.name));
+}
+
+/* --- format angka -> TeX --- */
+const rxTrim = m => (m.indexOf('.') < 0 ? m : m.replace(/0+$/, '').replace(/\.$/, ''));
+function rxNum(v, dec) {
+  if (typeof v !== 'number' || isNaN(v)) return RX_ERR;
+  if (!isFinite(v)) return v < 0 ? '-\\infty' : '\\infty';
+  const a = Math.abs(v);
+  if (a !== 0 && (a >= 1e7 || a < 1e-4)) { const p = v.toExponential(3).split('e'); return rxTrim(p[0]) + '\\times10^{' + (+p[1]) + '}'; }
+  let s = dec != null && dec >= 0 ? v.toFixed(Math.min(dec, 12)) : String(+v.toFixed(4));
+  if (+s === 0) s = s.replace('-', '');
+  return s;
+}
+function rxFmt(v, dec) { return typeof v === 'number' ? rxNum(v, dec) : typeof v === 'boolean' ? '\\text{' + v + '}' : RX_ERR; }
+const rxVarText = V => String(+V.val.toFixed(V.dec));
+
+function rxCallTex(R, c, id) {
+  switch (c.name) {
+    case 'fn': return null;                                   // tampil apa adanya (makro \fn)
+    case 'var': case 'sym': {
+      const V = c.d && R.vars[c.d.name]; if (!V) return RX_ERR;
+      return '\\rxv{' + id + '}{' + (c.name === 'sym' ? c.d.tex : rxVarText(V)) + '}';
+    }
+    case 'calc': {
+      const d = c.d; if (!d || R.failed.has(d.name) || !(d.name in R.scope)) return RX_ERR;
+      return '\\rxc{rx-val}{' + rxFmt(R.scope[d.name]) + '}';
+    }
+    default: {                                                // val, valn
+      let v; try { v = rxEv(R, rxExpr(c.args[0]), R.scope); } catch (_) { return RX_ERR; }
+      return '\\rxc{rx-val}{' + rxFmt(v, c.name === 'valn' ? parseInt(c.args[1], 10) : null) + '}';
+    }
+  }
+}
+function rxRenderHost(R, H) {
+  let src = '', last = 0;
+  H.calls.forEach((c, id) => {
+    const t = rxCallTex(R, c, id); if (t == null) return;
+    src += H.tex.slice(last, c.start) + t; last = c.end;
+  });
+  src += H.tex.slice(last);
+  if (src === H.lastSrc) return;                              // tidak ada yang berubah -> lewati
+  H.lastSrc = src;
+  const tmp = document.createElement('div');
+  try {
+    katex.render(src, tmp, { displayMode: H.display, throwOnError: false, trust: true, strict: 'ignore', macros: Object.assign({}, TW_KATEX_MACROS) });
+    H.host.replaceChildren(...tmp.firstElementChild.childNodes);   // host tetap -> pointer capture tidak putus
+  } catch (_) {}
+}
+function rxUpdate(R) {
+  rxEval(R);
+  R.hosts.forEach(H => { if (H.dyn) rxRenderHost(R, H); });
+  if (R.active) rxTipRefresh(R);
+}
+function rxSchedule(R) { if (!R.raf) R.raf = requestAnimationFrame(() => { R.raf = 0; rxUpdate(R); }); }
+function rxSet(R, V, v) {
+  v = +Math.min(V.max, Math.max(V.min, v)).toFixed(V.dec);
+  if (v === V.val) return;
+  V.val = v; R.mem[V.name] = { def: V.def, val: v }; rxSchedule(R);
+}
+
+/* --- tooltip "x = 3" (elemen #mp-tip yang sama dengan scrub grafik) --- */
+function rxTipEl() {
+  let t = document.getElementById('mp-tip');
+  if (!t) { t = document.createElement('div'); t.id = 'mp-tip'; document.body.appendChild(t); }
+  return t;
+}
+function rxTipHide(R) { if (R) R.active = null; const t = document.getElementById('mp-tip'); if (t) t.style.display = 'none'; }
+function rxTipRefresh(R) {
+  const a = R.active; if (!a) return;
+  const el = a.H.host.querySelector('[data-svid="' + a.id + '"]'); if (!el) return;
+  el.classList.add('sv-hot');
+  const r = el.getBoundingClientRect(), t = rxTipEl();
+  t.innerHTML = '<i>' + a.V.name + '</i> = ' + rxVarText(a.V);
+  t.style.display = 'block'; t.style.left = (r.left + r.width / 2) + 'px'; t.style.top = (r.top - 8) + 'px';
+}
+
+/* --- interaksi drag per rumus (hit-test berdasarkan koordinat: .vlist KaTeX sering menutupi <span> angka) --- */
+function rxBind(R, H) {
+  const host = H.host;
+  const varOf = id => { const c = H.calls[id]; return c && (c.name === 'var' || c.name === 'sym') && c.d ? R.vars[c.d.name] || null : null; };
+  const hit = e => {
+    let best = -1, area = Infinity;
+    host.querySelectorAll('[data-svid]').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+        const a = r.width * r.height; if (a < area) { area = a; best = +el.dataset.svid; }
+      }
+    });
+    return best;
+  };
+  let lastId = -1, lastT = 0;
+  host.addEventListener('pointermove', e => {
+    if (host.classList.contains('sv-dragging')) return;
+    const id = hit(e), V = id >= 0 ? varOf(id) : null;
+    host.querySelectorAll('.sv-hot').forEach(el => { if (!V || +el.dataset.svid !== id) el.classList.remove('sv-hot'); });
+    host.style.cursor = V ? 'ew-resize' : '';
+    if (V) { R.active = { H, id, V }; rxTipRefresh(R); } else rxTipHide(R);
+  });
+  host.addEventListener('pointerleave', () => {
+    if (host.classList.contains('sv-dragging')) return;
+    host.style.cursor = ''; host.querySelectorAll('.sv-hot').forEach(el => el.classList.remove('sv-hot')); rxTipHide(R);
+  });
+  host.addEventListener('pointerdown', e => {
+    const id = hit(e), V = id >= 0 ? varOf(id) : null; if (!V) return;
+    e.preventDefault(); host.setPointerCapture(e.pointerId);
+    R.active = { H, id, V };
+    const now = performance.now();
+    if (id === lastId && now - lastT < 350) { lastT = 0; rxSet(R, V, V.def); rxTipRefresh(R); return; }   // klik dua kali -> reset
+    const x0 = e.clientX, v0 = V.val, pxPerStep = Math.min(24, Math.max(1.5, 250 / Math.max(1, (V.max - V.min) / V.step)));
+    let moved = false;
+    host.classList.add('sv-dragging'); host.style.cursor = 'ew-resize'; rxTipRefresh(R);
+    const mv = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; rxSet(R, V, v0 + Math.round((ev.clientX - x0) / pxPerStep) * V.step); };
+    const up = () => {
+      host.classList.remove('sv-dragging');
+      host.removeEventListener('pointermove', mv); host.removeEventListener('pointerup', up); host.removeEventListener('pointercancel', up);
+      if (moved) { lastId = -1; lastT = 0; } else { lastId = id; lastT = performance.now(); }
+    };
+    host.addEventListener('pointermove', mv); host.addEventListener('pointerup', up); host.addEventListener('pointercancel', up);
+  });
+}
+
+function setupReactiveMath(root) {
+  if (!window.katex || !window.math) return;
+  const hosts = [];
+  root.querySelectorAll('.katex-display, .katex').forEach(host => {
+    if (host.classList.contains('katex') && host.parentElement && host.parentElement.classList.contains('katex-display')) return;
+    const ann = host.querySelector('annotation[encoding="application/x-tex"]'); if (!ann) return;
+    const tex = ann.textContent, calls = rxScan(tex); if (!calls.length) return;
+    hosts.push({ host, tex, calls, display: host.classList.contains('katex-display'), lastSrc: null, dyn: calls.some(c => c.name !== 'fn') });
+  });
+  rxTipHide(root._rx);
+  if (!hosts.length) { root._rx = null; return; }
+  const R = root._rx = { hosts, vars: {}, fns: [], calcs: [], scope: {}, failed: new Set(), cache: new Map(), raf: 0, active: null,
+                         mem: root._rxMem = root._rxMem || {} };
+  const seenF = new Set(), seenC = new Set();
+  hosts.forEach(H => H.calls.forEach(c => {                    // kumpulkan definisi dari seluruh dokumen (urutan bebas)
+    if (c.name === 'var' || c.name === 'sym') {
+      const d = c.d = rxParseVar(c.args[0]);
+      if (d && d.decl && !R.vars[d.name]) R.vars[d.name] = rxMakeVar(d, R.mem);
+    } else if (c.name === 'fn') {
+      const d = rxParseFn(c.args[0]);
+      if (d && !seenF.has(d.name)) { seenF.add(d.name); R.fns.push(d); }
+    } else if (c.name === 'calc') {
+      const d = c.d = rxParseCalc(c.args[0]);
+      if (d && !seenC.has(d.name)) { seenC.add(d.name); R.calcs.push(d); }
+    }
+  }));
+  rxUpdate(R);
+  hosts.forEach(H => { if (H.calls.some(c => (c.name === 'var' || c.name === 'sym') && c.d && R.vars[c.d.name])) rxBind(R, H); });
+}
+
+/* ===== SINKRON SCROLL EDITOR <-> PRATINJAU =====
+   Peta: baris sumber -> blok hasil render (renderMarkdownAndMath memberi data-src-line pada tiap blok level atas).
+   Posisi di dalam blok diinterpolasi linear. Peta dihitung saat Render, jadi setelah mengetik banyak
+   sebelum Render, posisi bisa meleset sedikit sampai Render berikutnya. */
+const EdSync = { offs: null, contentH: 0, nLines: 0, dirty: true, driver: null, raf: 0 };
+const edSyncOn = () => { try { return localStorage.getItem('tw-syncscroll') !== '0'; } catch (_) { return true; } };
+const edSideBySide = () => window.matchMedia('(min-width: 768px)').matches;
+
+function edLineOffsets() {          // posisi piksel awal tiap baris sumber di textarea (termasuk baris yang terlipat/wrap)
+  const ta = document.getElementById('editor-content');
+  if (!ta || !ta.clientWidth) return null;
+  if (EdSync.offs && !EdSync.dirty && EdSync.w === ta.clientWidth) return EdSync.offs;
+  let m = document.getElementById('ed-mirror');
+  if (!m) { m = document.createElement('div'); m.id = 'ed-mirror'; m.setAttribute('aria-hidden', 'true'); document.body.appendChild(m); }
+  const cs = getComputedStyle(ta);
+  m.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;left:-99999px;top:0;box-sizing:border-box;white-space:pre-wrap;overflow-wrap:break-word;word-wrap:break-word;border:0;';
+  ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'tabSize', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom']
+    .forEach(k => { m.style[k] = cs[k]; });
+  m.style.width = ta.clientWidth + 'px';
+  const lines = ta.value.split('\n'), frag = document.createDocumentFragment();
+  lines.forEach(l => { const d = document.createElement('div'); d.textContent = l || '\u200b'; frag.appendChild(d); });
+  m.textContent = ''; m.appendChild(frag);
+  EdSync.offs = Array.from(m.children, d => d.offsetTop);
+  EdSync.contentH = m.scrollHeight; EdSync.nLines = lines.length; EdSync.w = ta.clientWidth; EdSync.dirty = false;
+  m.textContent = '';
+  return EdSync.offs;
+}
+function edYToLine(y) {
+  const o = EdSync.offs; let lo = 0, hi = o.length - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (o[mid] <= y) lo = mid; else hi = mid - 1; }
+  const nx = lo + 1 < o.length ? o[lo + 1] : EdSync.contentH;
+  return lo + (y - o[lo]) / Math.max(1, nx - o[lo]);
+}
+function edLineToY(line) {
+  const o = EdSync.offs, i = Math.max(0, Math.min(o.length - 1, Math.floor(line)));
+  const nx = i + 1 < o.length ? o[i + 1] : EdSync.contentH;
+  return o[i] + (nx - o[i]) * Math.max(0, Math.min(1, line - i));
+}
+function edInterp(xs, ys, x) {        // interpolasi linear sepotong-sepotong, xs menaik
+  const n = xs.length; if (!n) return 0;
+  if (x <= xs[0]) return ys[0]; if (x >= xs[n - 1]) return ys[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (xs[mid] <= x) lo = mid; else hi = mid; }
+  const d = xs[hi] - xs[lo]; return d ? ys[lo] + (ys[hi] - ys[lo]) * (x - xs[lo]) / d : ys[lo];
+}
+function pvAnchors() {
+  const pv = document.getElementById('editor-live-preview');
+  const els = pv.querySelectorAll(':scope > [data-src-line]');
+  if (!els.length) return null;
+  const base = pv.getBoundingClientRect().top - pv.scrollTop, lines = [], tops = [];
+  els.forEach(e => { lines.push(+e.dataset.srcLine); tops.push(e.getBoundingClientRect().top - base); });
+  if (lines[0] > 0) { lines.unshift(0); tops.unshift(0); }
+  lines.push(Math.max(EdSync.nLines, lines[lines.length - 1] + 1)); tops.push(pv.scrollHeight);
+  return { lines, tops };
+}
+function edSyncToPreview() {
+  const ta = document.getElementById('editor-content'), pv = document.getElementById('editor-live-preview');
+  if (!edLineOffsets()) return;
+  const maxT = ta.scrollHeight - ta.clientHeight;
+  if (maxT > 0 && ta.scrollTop >= maxT - 1) { pv.scrollTop = pv.scrollHeight; return; }
+  const A = pvAnchors();
+  if (!A) { pv.scrollTop = maxT > 0 ? (ta.scrollTop / maxT) * (pv.scrollHeight - pv.clientHeight) : 0; return; }
+  pv.scrollTop = edInterp(A.lines, A.tops, edYToLine(ta.scrollTop));
+}
+function pvSyncToEditor() {
+  const ta = document.getElementById('editor-content'), pv = document.getElementById('editor-live-preview');
+  if (!edLineOffsets()) return;
+  const maxP = pv.scrollHeight - pv.clientHeight;
+  if (maxP > 0 && pv.scrollTop >= maxP - 1) { ta.scrollTop = ta.scrollHeight; return; }
+  const A = pvAnchors();
+  if (!A) { ta.scrollTop = maxP > 0 ? (pv.scrollTop / maxP) * (ta.scrollHeight - ta.clientHeight) : 0; return; }
+  ta.scrollTop = edLineToY(edInterp(A.tops, A.lines, pv.scrollTop));
+}
+function setEditorSync(on) { try { localStorage.setItem('tw-syncscroll', on ? '1' : '0'); } catch (_) {} if (on) edSyncToPreview(); }
+
+function initEditorSync() {
+  const ta = document.getElementById('editor-content'), pv = document.getElementById('editor-live-preview');
+  const cb = document.getElementById('editor-syncscroll');
+  if (!ta || !pv) return;
+  if (cb) cb.checked = edSyncOn();
+  const drive = who => () => { EdSync.driver = who; };
+  [['pointerenter', 'ta'], ['wheel', 'ta'], ['touchstart', 'ta'], ['focus', 'ta']].forEach(([ev, w]) => ta.addEventListener(ev, drive(w), { passive: true }));
+  [['pointerenter', 'pv'], ['wheel', 'pv'], ['touchstart', 'pv']].forEach(([ev, w]) => pv.addEventListener(ev, drive(w), { passive: true }));
+  const go = (who, fn) => () => {
+    if (EdSync.driver !== who || !edSyncOn() || !edSideBySide() || EdSync.raf) return;
+    EdSync.raf = requestAnimationFrame(() => { EdSync.raf = 0; if (EdSync.driver === who) fn(); });   // satu pembaruan per frame
+  };
+  ta.addEventListener('scroll', go('ta', edSyncToPreview), { passive: true });
+  pv.addEventListener('scroll', go('pv', pvSyncToEditor), { passive: true });
+  ta.addEventListener('input', () => { EdSync.dirty = true; });
+  window.addEventListener('resize', () => { EdSync.dirty = true; });
+  if (window.ResizeObserver) new ResizeObserver(() => { EdSync.dirty = true; }).observe(ta);
+}
+
+if (document.readyState === 'loading') window.addEventListener('DOMContentLoaded', initEditorRender);
+else initEditorRender();
+
 
 function handleSearch() {
   const query = document.getElementById('wiki-search-input').value;

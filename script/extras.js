@@ -82,19 +82,21 @@ const NON_CODE_FENCES = new Set(['graph', 'steps', 'flow', 'glossary']);   // di
 function preprocessMarkdown(src) {
   const lines = String(src).replace(/\r\n?/g, '\n').split('\n');
   const out = [];
+  const srcOf = []; let cur = 0;                    // peta: baris hasil -> baris asli (untuk sinkron scroll)
+  const put = s => { out.push(s); srcOf.push(cur); };
   let fence = null;          // { ch, len }
   let depth = 0;             // kedalaman ::: yang sedang terbuka
 
   const pfx = () => '> '.repeat(depth);
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]; cur = i;
 
     /* --- di dalam fence kode: salin apa adanya (plus prefix blockquote) --- */
     if (fence) {
       const close = line.match(/^\s{0,3}(`{3,}|~{3,})\s*$/);
       if (close && close[1][0] === fence.ch && close[1].length >= fence.len) fence = null;
-      out.push(pfx() + line);
+      put(pfx() + line);
       continue;
     }
 
@@ -104,9 +106,9 @@ function preprocessMarkdown(src) {
       fence = { ch: open[2][0], len: open[2].length };
       const lang = open[3], extra = open[4].trim();
       if (lang && extra) {
-        out.push(pfx() + open[1] + open[2] + lang + '{' + encodeURIComponent(extra) + '}');
+        put(pfx() + open[1] + open[2] + lang + '{' + encodeURIComponent(extra) + '}');
       } else {
-        out.push(pfx() + line);
+        put(pfx() + line);
       }
       continue;
     }
@@ -117,23 +119,24 @@ function preprocessMarkdown(src) {
 
     if (cClose && depth > 0) {
       depth--;
-      out.push(pfx().trimEnd());     // baris kosong (tetap di dalam callout luar bila bersarang)
-      if (depth === 0) out.push(''); // putus blockquote agar paragraf berikutnya tidak "menempel"
+      put(pfx().trimEnd());     // baris kosong (tetap di dalam callout luar bila bersarang)
+      if (depth === 0) put(''); // putus blockquote agar paragraf berikutnya tidak "menempel"
       continue;
     }
     if (cOpen && !cClose) {
       const base = cOpen[1].replace(/[+-]$/, '');
       if (resolveCalloutType(base)) {
-        if (out.length && out[out.length - 1].trim() !== '' && depth === 0) out.push('');
-        out.push(pfx() + '> [!' + cOpen[1] + '] ' + cOpen[2]);
+        if (out.length && out[out.length - 1].trim() !== '' && depth === 0) put('');
+        put(pfx() + '> [!' + cOpen[1] + '] ' + cOpen[2]);
         depth++;
         continue;
       }
     }
 
-    out.push(depth ? (line.trim() === '' ? pfx().trimEnd() : pfx() + line) : line);
+    put(depth ? (line.trim() === '' ? pfx().trimEnd() : pfx() + line) : line);
   }
   // callout yang lupa ditutup: biarkan (blockquote berakhir sendiri di akhir dokumen)
+  preprocessMarkdown.lastMap = srcOf;
   return out.join('\n');
 }
 

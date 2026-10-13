@@ -140,3 +140,15 @@ details.callout[open] .callout-chev{ transform:rotate(180deg); }
    ikut bergeser/ter-scroll bersama konten. "backwards" menghilangkan efek itu setelah animasi selesai. */
 
 /* .tab-content{ animation-fill-mode:backwards; } */
+
+/* ---- angka scrub di dalam rumus: \sv{2} / \svr{...} ---- */
+[data-svid]{color:var(--link,#1d4ed8);cursor:ew-resize;border-bottom:2px dotted var(--link,#1d4ed8);background:rgba(29,78,216,.07);padding:0 .12em;user-select:none;-webkit-user-select:none;touch-action:none;transition:background .15s}
+[data-svid] *{touch-action:none}
+[data-svid].sv-hot{background:rgba(29,78,216,.18)}
+.rx-val{color:#0f766e}
+.rx-err{color:#b42318}
+.sv-dragging{cursor:ew-resize}
+
+/* ---- status render editor ---- */
+#editor-render-status.dirty{color:#b8321f}
+#editor-render-btn:disabled{cursor:progress}
