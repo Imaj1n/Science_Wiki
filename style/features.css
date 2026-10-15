@@ -152,3 +152,27 @@ details.callout[open] .callout-chev{ transform:rotate(180deg); }
 /* ---- status render editor ---- */
 #editor-render-status.dirty{color:#b8321f}
 #editor-render-btn:disabled{cursor:progress}
+
+
+/* ---- syntax highlighting editor (highlight.js): <pre> di belakang <textarea> transparan ----
+   Token hanya mengubah WARNA/garis bawah, tidak boleh mengubah lebar glyph (tanpa tebal/miring) agar tetap sejajar. */
+.hl-layer{position:absolute;inset:0;margin:0;overflow:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal;box-sizing:border-box;border-style:solid;border-color:transparent;z-index:0;font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0;color:#35322d}
+.hl-layer code{font:inherit;background:none;padding:0;color:inherit;white-space:inherit;letter-spacing:inherit}
+.hl-layer.hl-off{display:none}
+.hl-layer.hl-hidden{visibility:hidden}
+#editor-content.hl-on{position:relative;z-index:1;background:transparent!important;color:transparent!important;font-variant-ligatures:none;font-feature-settings:"liga" 0,"calt" 0}
+#editor-content.hl-on.hl-stale{color:var(--hl-fg)!important}
+#editor-content.hl-on::selection{background:rgba(184,50,31,.22);color:transparent}
+#editor-content.hl-on.hl-stale::selection{color:inherit}
+.hl-h{color:#b8321f}.hl-hm{color:#b8321f;opacity:.55}
+.hl-b{color:#7c2d12;text-decoration:underline;text-decoration-color:rgba(124,45,18,.35)}
+.hl-it{color:#6b21a8}
+.hl-ic{color:#0f7a55;background:rgba(15,122,85,.09);border-radius:3px}
+.hl-md{color:#1d4ed8}.hl-tx{color:#7c3aed}.hl-rx{color:#c2410c;text-decoration:underline}
+.hl-num{color:#0369a1}.hl-mu{color:#8a847a}.hl-type{color:#0f7a55}
+.hl-wl{color:#0369a1}.hl-gl{color:#7c3aed}.hl-lt{color:#0369a1}.hl-url{color:#8a847a;text-decoration:underline;text-decoration-color:rgba(138,132,122,.4)}
+.hl-tg{color:#a16207}.hl-cm{color:#8a847a}.hl-ht{color:#6b665d}
+.hl-fence,.hl-lang,.hl-co,.hl-cot{color:#a16207}.hl-lang{text-decoration:underline}
+.hl-bq,.hl-li{color:#b8321f}
+.hl-kw{color:#b8321f}.hl-str{color:#0f7a55}.hl-fn{color:#1d4ed8}
+.hl-key{color:#7c3aed}.hl-id{color:#1d4ed8}

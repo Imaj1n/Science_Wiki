@@ -28,7 +28,7 @@ const MRE=/(\$\$[\s\S]+?\$\$|\$[^$\n]+?\$)/;
 const mm=s=>s.slice(0,2)=='$$'?km(s.slice(2,-2),true):km(s.slice(1,-1),false);
 const rich=s=>s.split(MRE).map((p,i)=>i%2?mm(p):esc(p)).join('');
 const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const FT=e=>new Function('t','v','with(FlowEngine.MX){with(Math){with(v){return('+rep(e)+')}}}');
+const FT=e=>new Function('t','v','with(Math){with(FlowEngine.MX){with(v){return('+rep(e)+')}}}');
 const nn=x=>typeof x=='number'?String(+x.toPrecision(5)).replace(/e([+-]?\d+)/,'\\cdot10^{$1}'):String(x);
 const tx=(x,p)=>Array.isArray(x)?'\\begin{bmatrix}'+(Array.isArray(x[0])?x:[x]).map(r=>r.map(nn).join('&')).join('\\\\')+'\\end{bmatrix}':(p&&x<0?'\\left('+nn(x)+'\\right)':nn(x));
 const fmt=x=>Array.isArray(x)?'['+x.map(fmt).join(', ')+']':typeof x=='number'?(Number.isInteger(x)?String(x):String(+x.toPrecision(7))):String(x);
@@ -38,6 +38,9 @@ const cell=x=>Array.isArray(x)?mat(x):fmt(x);
 const MX={mul:(A,B)=>A.map(r=>B[0].map((_,j)=>r.reduce((s,a,k)=>s+a*B[k][j],0))),add:(A,B)=>A.map((r,i)=>r.map((a,j)=>a+B[i][j])),sub:(A,B)=>A.map((r,i)=>r.map((a,j)=>a-B[i][j])),scale:(k,A)=>A.map(r=>r.map(a=>k*a)),T:A=>A[0].map((_,j)=>A.map(r=>r[j])),eye:n=>Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>+(i==j))),norm:A=>Math.hypot(...[A].flat(9)),
 det:A=>{const M=A.map(r=>[...r]),n=M.length;let d=1;for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(M[r][i])>Math.abs(M[p][i]))p=r;if(!M[p][i])return 0;if(p!=i){[M[p],M[i]]=[M[i],M[p]];d=-d}d*=M[i][i];for(let r=i+1;r<n;r++){const f=M[r][i]/M[i][i];for(let c=i;c<n;c++)M[r][c]-=f*M[i][c]}}return d},
 inv:A=>{const n=A.length,M=A.map((r,i)=>[...r,...MX.eye(n)[i]]);for(let i=0;i<n;i++){let p=i;for(let r=i+1;r<n;r++)if(Math.abs(M[r][i])>Math.abs(M[p][i]))p=r;if(!M[p][i])throw Error('matriks singular');[M[p],M[i]]=[M[i],M[p]];const d=M[i][i];M[i]=M[i].map(x=>x/d);for(let r=0;r<n;r++)if(r!=i){const f=M[r][i];M[r]=M[r].map((x,c)=>x-f*M[i][c])}}return M.map(r=>r.slice(n))}};
+let CUR=null;   // [ACAK] objek state yang sedang dijalankan; state RNG ada di CUR.__s sehingga ikut tersimpan/undo
+if(window.TWRandom)Object.assign(MX,TWRandom.engineFns(()=>CUR));   // random, normal, binomial, poisson, ..., normcdf, ... (lihat random.js)
+const RNDRE=/\b(?:random|rand|randn|gauss|randint|choice|shuffle|times|normal|lognormal|uniform|exponential|bernoulli|binomial|poisson|geometric)\s*\(/;
 const rep=s=>s.replace(/\^/g,'**');
 const COL=['#273340','#ff9800','#2f56c9','#d94f3d'];
 let WZ=40;
@@ -59,6 +62,7 @@ function parse(src,off=0){
  const nodes=[],P={nodes,plot:[],curve:null,params:[],views:[],derive:[]};
  for(const [li,raw] of src.split('\n').entries()){
   let l=raw.trim(),m,go;const ln_=off+li+1;if(!l||l[0]=='#')continue;
+  if(m=l.match(/^seed:\s*(\d+)/i)){P.seed=(+m[1])>>>0;continue}
   if(m=l.match(/^plot:\s*(.+)/i)){P.plot=m[1].split(',').map(s=>s.trim()).filter(Boolean);continue}
   if(m=l.match(/^conv:\s*(.+)/i)){P.conv=m[1].trim();continue}
   if(m=l.match(/^out:\s*(.+)/i)){P.out=m[1].split(',').map(s=>s.trim()).filter(Boolean);continue}
@@ -79,31 +83,35 @@ function parse(src,off=0){
   if(n.type=='cond'){
    const m=n.code.match(/^([\s\S]*?)\?\s*(\w+)\s*:\s*(\w+)\s*$/);
    if(!m||ix[m[2]]==null||ix[m[3]]==null)throw Error('Node '+n.id+': kondisi harus berbentuk  ekspresi ? idYa : idTidak');
-   n.test=m[1];n.t=ix[m[2]];n.f=ix[m[3]];n.ft=new Function('v','with(FlowEngine.MX){with(Math){with(v){return('+rep(m[1])+')}}}');
+   n.test=m[1];n.t=ix[m[2]];n.f=ix[m[3]];n.ft=new Function('v','with(Math){with(FlowEngine.MX){with(v){return('+rep(m[1])+')}}}');
   }else{
    if(n.go!=null&&ix[n.go]==null)throw Error('Node '+n.id+': tujuan "'+n.go+'" tidak ada');
    n.next=n.type=='end'?null:n.go!=null?ix[n.go]:(i+1<nodes.length?i+1:null);
-   if(n.code)n.fn=new Function('v','with(FlowEngine.MX){with(Math){with(v){'+rep(n.code)+'\n}}}');
+   if(n.code)n.fn=new Function('v','with(Math){with(FlowEngine.MX){with(v){'+rep(n.code)+'\n}}}');
   }});
-  cur=null;if(P.curve)P.curve.fn=new Function('t','v','with(FlowEngine.MX){with(Math){with(v){return('+rep(P.curve.f)+')}}}');
+  cur=null;if(P.curve)P.curve.fn=new Function('t','v','with(Math){with(FlowEngine.MX){with(v){return('+rep(P.curve.f)+')}}}');
  }catch(e){return{err:e.message,line:cur&&cur.line}}
+ P.rand=P.seed!=null||nodes.some(n=>RNDRE.test(n.code||'')||RNDRE.test(n.test||''));
  return P}
 
 let UID=0;
 function mount(el,src,off,opt){
  const P=parse(src,off);if(P.err){el.innerHTML='<div class="err">⚠ '+(P.line?'Baris '+P.line+': ':'')+esc(P.err)+(P.line&&opt&&opt.goto?'<button>Ke baris</button>':'')+'</div>';const b=el.querySelector('button');if(b)b.onclick=()=>gotoLine(P.line);return}
  const N=P.nodes,id=++UID;
+ let SEED=P.seed!=null?P.seed:(Math.random()*4294967296)>>>0;
  el.innerHTML='<div class="fl"><div class="cv"><svg class="ed"></svg><div class="col"></div></div><div class="side"><div class="ctl c1"><button data-a="b">◀ Mundur</button><button data-a="s">Langkah</button><button data-a="p" class="pri">▶ Jalankan</button><button data-a="r">Ulangi</button><select data-mode aria-label="Mode jalan"><option value="anim">Animasi</option><option value="inst">Instan</option><option value="whatif">Eksplorasi</option><option value="explain">Penjelasan</option></select><label>kecepatan <input type="range" min="1" max="10" value="5"></label></div><div class="ctl"><input type="range" data-sc min="0" max="0" value="0" style="flex:1" aria-label="Linimasa langkah"><span class="mu sn"></span></div><div class="prm"></div><div class="vars"></div><div class="xp" hidden></div><div class="wi" hidden></div><div class="dt" hidden></div><div class="ctl"><label class="ck"><input type="checkbox" data-o="log">skala log</label><label class="ck"><input type="checkbox" data-o="shared">sumbu bersama</label></div><canvas class="ch"></canvas><canvas class="cu"></canvas><canvas class="cg"></canvas><div class="cx mu"></div><div class="vw"></div><div class="log"></div></div></div>';
  const Q=s=>el.querySelector(s),cv=Q('.cv'),svg=Q('.ed'),col=Q('.col'),cch=Q('.ch'),ccu=Q('.cu'),btnP=Q('[data-a=p]'),scr=Q('[data-sc]'),tip=Object.assign(document.createElement('div'),{className:'tip',hidden:true});el.append(tip);
+ const sdEl=document.createElement('span');sdEl.className='mu sd';
+ if(P.rand){const zb=document.createElement('button');zb.dataset.a='z';zb.title='Ambil seed baru lalu ulangi dari awal';zb.textContent='🎲 Acak ulang';Q('[data-a=r]').after(zb);zb.after(sdEl)}
  N.forEach(n=>{n.el=document.createElement('div');n.el.className='nd '+n.type;n.el.innerHTML='<span class="tp">'+({start:'🚀 mulai',proc:'🧮 hitung',cond:'🤔 tanya',end:'🏁 selesai'}[n.type]||n.type)+'</span><div class="lb">'+rich(n.label)+'</div><div class="rc"></div><div class="sb"></div>';n.sb=n.el.lastChild;col.append(n.el)});
  const names=new Set();
  N.forEach(n=>{if(n.type!='cond')(n.code||'').replace(/(?:^|[;\s,(])([A-Za-z_]\w*)\s*[-+*\/]?=(?!=)/g,(m,a)=>names.add(a))});
  P.params.forEach(p=>names.add(p.k));N.forEach(n=>{const c=n.type=='cond'?n.test:n.code;if(c)n.el.querySelector('.rc').innerHTML=(n.type=='cond'?'<div class="st"><span class="vb">apakah</span><span class="ex">'+tk(c,names)+'</span><span class="vb">?</span></div>':pretty(c,names))+'<details class="raw"><summary>‹/› kode asli</summary><code>'+esc(c)+'</code></details>'});N.forEach(n=>{n.cols=[...new Set(((n.type=='cond'?n.test:n.code)||'').match(/[A-Za-z_]\w*/g)||[])].filter(k=>names.has(k))});const E=[];N.forEach((n,i)=>{if(n.type=='cond'){E.push([i,n.t,'ya']);if(n.f!=n.t)E.push([i,n.f,'tidak'])}else if(n.next!=null)E.push([i,n.next,''])});
  let v,pv,pc,hist,L,done,steps,edge,playing=false,sel=null,U=[],hn=[-1],HV=null,far=0,MODE='anim',BASE=null,BASEV=null,APR=null,OUT=null,XS=0;
- function reset(){U=[];hn=[-1];HV=null;far=0;N.forEach(n=>{n.vis=[];n.sb.innerHTML=''});v={};names.forEach(k=>v[k]=0);P.params.forEach(p=>v[p.k]=p.val);pv=null;pc=0;hist=[structuredClone(v)];L=[];done=false;steps=0;edge='';playing=false;btnP.textContent='▶ Jalankan';render();if(MODE=='whatif')runAll()}
+ function reset(){U=[];hn=[-1];HV=null;far=0;N.forEach(n=>{n.vis=[];n.sb.innerHTML=''});v={};names.forEach(k=>v[k]=0);P.params.forEach(p=>v[p.k]=p.val);v.__s=SEED|0;sdEl.textContent=P.rand?'seed '+(SEED>>>0):'';pv=null;pc=0;hist=[structuredClone(v)];L=[];done=false;steps=0;edge='';playing=false;btnP.textContent='▶ Jalankan';render();if(MODE=='whatif')runAll()}
  function runAll(){playing=false;btnP.textContent='▶ Jalankan';let i=0;while(!done&&i++<5200)step(true);render()}
  function step(q){
-  if(done)return;const n=N[pc];U.push({v:structuredClone(v),pv,pc,done,steps,edge,hl:hist.length,ll:L.length,vl:N.map(n=>n.vis.length)});pv=structuredClone(v);let to=null,res;
+  if(done)return;CUR=v;const n=N[pc];U.push({v:structuredClone(v),pv,pc,done,steps,edge,hl:hist.length,ll:L.length,vl:N.map(n=>n.vis.length)});pv=structuredClone(v);let to=null,res;
   try{
    if(n.type=='cond'){const r=!!n.ft(v);res=r;to=r?n.t:n.f;L.push(n.id+' ? '+(r?'ya':'tidak')+' → '+N[to].id)}
    else{
@@ -131,7 +139,7 @@ function mount(el,src,off,opt){
  function back(){const s=U.pop();if(!s)return;v=s.v;pv=s.pv;pc=s.pc;done=s.done;steps=s.steps;edge=s.edge;hist.length=hn.length=s.hl;L.length=s.ll;N.forEach((n,i)=>{n.vis.length=s.vl[i];n.sb.innerHTML=(n.vis[n.vis.length-1]||{}).s||''});render()}
  function vw(){el.querySelectorAll('.vc').forEach((c,i)=>{try{view(c,P.views[i])}catch(e){}})}
  function view(c,V){
-  if(!c.clientWidth)return;const H=hh(c,190),[g,w]=cvs(c,H),mut=css(c,'--mut'),ac=css(c,'--ac'),A=V.a,E=s=>(V.f=V.f||{})[s]||(V.f[s]=FT(s)),Z=(s,r,u)=>E(s)(u||0,r),last=hist[hist.length-1],prev=hist[hist.length-2]||last,p=56,m=[56,14,12,34],LB=({scatter:[A[0],A[1]],param:['x(t)','y(t)'],vec:['x','y'],tangent:[A[1],'f(t)'],interval:['t','f(t)'],bar:['indeks',A[0]],fit:[A[3]||'x',A[4]||'y']})[V.t]||['x','y'];
+  if(!c.clientWidth)return;const H=hh(c,190),[g,w]=cvs(c,H),mut=css(c,'--mut'),ac=css(c,'--ac'),A=V.a,E=s=>(V.f=V.f||{})[s]||(V.f[s]=FT(s)),Z=(s,r,u)=>E(s)(u||0,r),last=hist[hist.length-1],prev=hist[hist.length-2]||last,p=56,m=[56,14,12,34],LB=({scatter:[A[0],A[1]],param:['x(t)','y(t)'],vec:['x','y'],tangent:[A[1],'f(t)'],interval:['t','f(t)'],bar:['indeks',A[0]],fit:[A[3]||'x',A[4]||'y'],hist:[A[0],'densitas']})[V.t]||['x','y'];
   const fr=(x0,x1,y0,y1)=>{const X=x=>m[0]+(x-x0)/(x1-x0||1)*(w-m[0]-m[2]),Y=y=>H-m[3]-(y-y0)/(y1-y0||1)*(H-m[1]-m[3]);axes(c,g,w,H,m,X,Y,[x0,x1],[y0,y1],LB[0],LB[1]);g.strokeStyle=css(c,'--fg');g.lineWidth=1;if(x0<0&&x1>0){g.beginPath();g.moveTo(X(0),m[1]);g.lineTo(X(0),H-m[3]);g.stroke()}if(y0<0&&y1>0){g.beginPath();g.moveTo(m[0],Y(0));g.lineTo(w-m[2],Y(0));g.stroke()}return[X,Y]};
   const rg=a=>{let lo=Math.min(...a),hi=Math.max(...a);if(!isFinite(lo+hi))return[0,1];if(lo==hi){lo--;hi++}const d=(hi-lo)*.08;return[lo-d,hi+d]},dt=(x,y,r,col)=>{g.fillStyle=col;g.beginPath();g.arc(x,y,r,0,7);g.fill()},ln=(X,Y,xs,ys)=>{g.strokeStyle=ac;g.lineWidth=1.5;g.beginPath();xs.forEach((x,i)=>i?g.lineTo(X(x),Y(ys[i])):g.moveTo(X(x),Y(ys[i])));g.stroke()};
   if(V.t=='scatter'){const pr=hist.map(r=>{try{return[+Z(A[0],r),+Z(A[1],r)]}catch(e){return null}}).filter(q=>q&&isFinite(q[0]+q[1])),xs=pr.map(q=>q[0]),ys=pr.map(q=>q[1]),[X,Y]=fr(...rg(xs),...rg(ys));ln(X,Y,xs,ys);xs.forEach((x,i)=>dt(X(x),Y(ys[i]),i==xs.length-1?5:2.5,i==xs.length-1?'#e5484d':ac))}
@@ -157,6 +165,24 @@ function mount(el,src,off,opt){
    g.fillStyle=fg;g.textAlign='center';g.font='800 11px system-ui,sans-serif';g.fillText(A[3]||'kolom j',ox+nx*s/2,H-4);g.save();g.translate(11,oy+ny*s/2);g.rotate(-Math.PI/2);g.fillText(A[4]||'baris i',0,0);g.restore();
    const bx=ox+nx*s+16,bh=ny*s;for(let q=0;q<bh;q++){g.fillStyle=hc(1-q/bh);g.fillRect(bx,oy+q,12,1.5)}g.strokeStyle=fg;g.lineWidth=1;g.strokeRect(bx,oy,12,bh);g.textAlign='left';g.font='700 10.5px system-ui,sans-serif';g.fillStyle=css(c,'--mut');[[hi,0,8],[(lo+hi)/2,.5,4],[lo,1,0]].forEach(([q,f,d])=>g.fillText(tl(q),bx+17,oy+f*bh+d));g.restore();c._hm={ox,oy,s,nx,ny,G}}
   else if(V.t=='bar'){const f=r=>[Z(A[0],r)].flat(9),b=f(last),o=f(prev),n=b.length,[X,Y]=fr(0,n,Math.min(0,...b)*1.1,Math.max(0,...b)*1.1||1);b.forEach((y,i)=>{g.fillStyle=y!=o[i]?'#e5484d':ac;g.fillRect(X(i)+2,Math.min(Y(0),Y(y)),X(i+1)-X(i)-4,Math.abs(Y(y)-Y(0)));if(n<=12){g.fillStyle=mut;g.fillText(fmt(+y.toPrecision(3)),X(i)+3,Y(y)-3)}})}
+  else if(V.t=='hist'){   // [ACAK] view: hist | variabel | jumlah-bin atau auto | Distribusi(parameter)   (distribusi teoretis opsional)
+   const R=window.TWRandom,nm=A[0];
+   let xs=Array.isArray(last[nm])?last[nm].flat(9):hist.slice(1).map(r=>r[nm]);xs=xs.filter(q=>typeof q=='number'&&isFinite(q));
+   let D=null,msg='';if(A[2]&&R){try{const q=R.parseCall(A[2]);if(!q)throw Error('tulis distribusi seperti Normal(0, 1)');D=R.make(q.name,q.args.map(s=>+Z(s,last)))}catch(e){msg=e.message}}
+   const n=xs.length,mn=xs.reduce((a,b)=>Math.min(a,b),Infinity),mx=xs.reduce((a,b)=>Math.max(a,b),-Infinity),disc=D?D.discrete:n>0&&xs.every(Number.isInteger)&&mx-mn<=40;
+   let lo=n?mn:Infinity,hi=n?mx:-Infinity;
+   if(D){const sd=Math.sqrt(D.variance)||1;lo=Math.min(lo,Math.max(D.support[0],D.mean-4*sd));hi=Math.max(hi,Math.min(D.support[1],D.mean+4*sd))}
+   if(!isFinite(lo+hi)){lo=0;hi=1}
+   let bins;if(disc){lo=Math.floor(lo)-.5;hi=Math.ceil(hi)+.5;bins=Math.round(hi-lo)}else{if(hi==lo){lo-=.5;hi+=.5}bins=Math.round(+A[1])||Math.max(8,Math.min(50,Math.round(Math.sqrt(n))))}
+   const HG=R.hist(xs,bins,lo,hi);let ps=[],S=[];
+   if(D){if(disc){for(let k=Math.ceil(lo);k<=Math.floor(hi)&&S.length<400;k++)S.push(k)}else S=Array.from({length:161},(_,i)=>lo+(hi-lo)*i/160);ps=S.map(D.pdf)}
+   const[X,Y]=fr(lo,hi,0,(Math.max(0,...HG.density,...ps)||1)*1.4);
+   g.save();g.globalAlpha=.5;g.fillStyle=ac;HG.density.forEach((d,i)=>{const x0=X(HG.edges[i])+1,x1=X(HG.edges[i+1])-1;g.fillRect(x0,Y(d),Math.max(1,x1-x0),Y(0)-Y(d))});g.restore();
+   if(D){g.strokeStyle=g.fillStyle='#e5484d';g.lineWidth=2;if(disc)S.forEach((k,i)=>dt(X(k),Y(ps[i]),3.5,'#e5484d'));else{g.beginPath();S.forEach((x,i)=>i?g.lineTo(X(x),Y(ps[i])):g.moveTo(X(x),Y(ps[i])));g.stroke()}}
+   const mean=n?xs.reduce((a,b)=>a+b,0)/n:NaN,sdv=n>1?Math.sqrt(xs.reduce((a,b)=>a+(b-mean)**2,0)/(n-1)):NaN,rx=w-m[2]-6;
+   g.fillStyle=css(c,'--fg');g.textAlign='right';g.fillText(n?'n = '+n+' · x̄ = '+fmt(+mean.toPrecision(4))+(n>1?' · s = '+fmt(+sdv.toPrecision(4)):''):'belum ada data — jalankan diagram',rx,m[1]+14);
+   if(D)g.fillText(D.label+' · μ = '+fmt(+D.mean.toPrecision(4))+' · σ = '+fmt(+Math.sqrt(D.variance).toPrecision(4)),rx,m[1]+28);
+   if(msg){g.fillStyle='#e5484d';g.fillText('⚠ '+msg,rx,m[1]+(D?42:28))}g.textAlign='left'}
   g.fillStyle=mut;g.fillText(V.t+' · '+A.join(' , '),m[0]+4,10)}
  function pick(i){sel=i==sel?null:i;N.forEach((n,j)=>n.el.classList.toggle('sel',j==sel));detail();}
  function detail(){
@@ -218,6 +244,7 @@ function mount(el,src,off,opt){
  el.addEventListener('click',e=>{const nd=e.target.closest('.nd'),a=e.target.dataset&&e.target.dataset.a;const xi=e.target.closest('[data-xi]');if(xi){XS=+xi.dataset.xi;xpr();return}if(nd&&!e.target.closest('.scr,details')){pick(N.findIndex(n=>n.el==nd));return}if(a=='x'){pick(null);return}if(!a)return;act(a)});
  const act=a=>{
   if(MODE=='explain')a={s:'xn',p:'xn',b:'xp'}[a]||a;
+  if(a=='z'){SEED=(Math.random()*4294967296)>>>0;BASE=null;reset();return}
   if(a=='xn'){XS++;xpr();return}if(a=='xp'){XS=Math.max(0,XS-1);xpr();return}if(a=='xgo'){MODE='anim';Q('[data-mode]').value='anim';BASE=null;reset();return}
   if(a=='bl'){BASE=null;wi();return}
   if(a=='p'&&MODE!='anim'){playing=false;reset();if(!done)runAll();return}
@@ -238,7 +265,7 @@ function mount(el,src,off,opt){
  const up=()=>{if(drag){drag=null;tip.hidden=true}};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
  el.addEventListener('keydown',e=>{const s=e.target.closest&&e.target.closest('.scr'),d={ArrowRight:1,ArrowUp:1,ArrowLeft:-1,ArrowDown:-1}[e.key];if(s&&d){const p=P.params.find(q=>q.k==s.dataset.sp);setP(p,p.val+d*p.step);e.preventDefault();e.stopPropagation()}});
  el.addEventListener('change',e=>{const d=e.target.dataset;if(d.w=='p'){APR=e.target.value;wi()}if(d.w=='o'){OUT=e.target.value;wi()}if(d.mode!=null){MODE=e.target.value;BASE=null;reset()}});
- function sim(ov){const w={};names.forEach(k=>w[k]=0);P.params.forEach(p=>w[p.k]=p.val);Object.assign(w,ov);try{let c=0,i=0;while(i++<5000){const n=N[c];if(n.type=='cond')c=n.ft(w)?n.t:n.f;else{if(n.fn)n.fn(w);if(n.type=='end'||n.next==null)break;c=n.next}}return w}catch(e){return null}}
+ function sim(ov){const w={};names.forEach(k=>w[k]=0);P.params.forEach(p=>w[p.k]=p.val);w.__s=SEED|0;CUR=w;Object.assign(w,ov);try{let c=0,i=0;while(i++<5000){const n=N[c];if(n.type=='cond')c=n.ft(w)?n.t:n.f;else{if(n.fn)n.fn(w);if(n.type=='end'||n.next==null)break;c=n.next}}return w}catch(e){return null}}
  function wi(){const W=Q('.wi');W.hidden=false;
   if(!P.params.length||!outs.length){W.innerHTML='<div class="mu">Mode eksplorasi butuh parameter: tambahkan baris <code>param: nama = nilai | min | maks | langkah | simbol</code>.</div>';return}
   if(!BASE){BASE={};BASEV={};outs.forEach(k=>BASE[k]=structuredClone(v[k]));P.params.forEach(p=>BASEV[p.k]=p.val)}
@@ -253,7 +280,7 @@ function mount(el,src,off,opt){
   g.strokeStyle=mut;g.beginPath();g.arc(X(BASEV[ap.k]),Y(sc(BASE[ok])),5,0,7);g.stroke();
   g.fillStyle='#e5484d';g.beginPath();g.arc(X(ap.val),Y(sc(v[ok])),5,0,7);g.fill()}
  const dg=document.createElement('div');dg.className='dg';cv.after(dg);dg.append(Q('.dt'));
- const WD=[],dock=document.createElement('div'),VN={tangent:'Garis singgung',interval:'Interval',vec:'Vektor',scatter:'Sebaran',param:'Parametrik',bar:'Batang',fit:'Data & garis',heat:'Peta panas'},VC=[...el.querySelectorAll('.vc')];dock.className='dock';Q('.log').before(dock);dock.innerHTML='<span class="mu">grafik mengambang, klik untuk membuka:</span>';
+ const WD=[],dock=document.createElement('div'),VN={tangent:'Garis singgung',interval:'Interval',vec:'Vektor',scatter:'Sebaran',param:'Parametrik',bar:'Batang',fit:'Data & garis',heat:'Peta panas',hist:'Histogram'},VC=[...el.querySelectorAll('.vc')];dock.className='dock';Q('.log').before(dock);dock.innerHTML='<span class="mu">grafik mengambang, klik untuk membuka:</span>';
  function mkw(ic,title,nodes){const w=document.createElement('div'),b=document.createElement('button'),k=WD.length,hd=()=>w.querySelector('.wh');w.className='wd';w.hidden=true;w.innerHTML='<div class="wh"><b>'+ic+' '+title+'</b><button title="Tutup">✕</button></div><div class="wb"></div>';nodes.forEach(x=>w.lastChild.append(x));WD.push(w);
   b.textContent=ic+' '+title;const set=on=>{w.hidden=!on;b.classList.toggle('on',on);if(on){w.style.zIndex=++WZ;charts()}};
   b.onclick=()=>{const first=w.hidden&&!w.style.left;let px,py;if(first){const r=dock.getBoundingClientRect();px=Math.max(8,Math.min(r.left,innerWidth-440));py=Math.max(8,Math.min(r.bottom+12+k*28,innerHeight-330))}set(w.hidden);if(first)fx(w,px,py)};

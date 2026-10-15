@@ -456,6 +456,9 @@
                 </button>
                 <span id="editor-render-status" class="font-mono text-slate-500">Tersinkron</span>
                 <div class="ml-auto flex items-center gap-3 text-slate-400">
+                  <label class="flex items-center gap-1 cursor-pointer select-none" title="Warnai sintaks markdown, rumus, dan blok kode di editor">
+                    <input type="checkbox" id="editor-highlight"> Highlight
+                  </label>
                   <label class="flex items-center gap-1 cursor-pointer select-none" title="Pratinjau ikut ter-scroll saat editor di-scroll (dan sebaliknya)">
                     <input type="checkbox" id="editor-syncscroll" onchange="setEditorSync(this.checked)"> Sync scroll
                   </label>
@@ -616,6 +619,8 @@
     </div>
     </div>
 <script src="script/extras.js"></script>
+<script src="script/random.js"></script>
+<script src="script/highlight.js"></script>
 <script src="script/flow-engine.js"></script>
 <script src="script/glossary.js"></script>
 <script src="script/script.js"></script>

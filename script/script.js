@@ -1255,6 +1255,7 @@ function initEditorRender() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); renderEditorNow(); }
   });
   initEditorSync();
+  if (window.TWHighlight && ta) TWHighlight.attach(ta, document.getElementById('editor-highlight'));   // highlight.js
 }
 
 // Render langsung (sinkron). Dipakai tombol Render, buka editor, sisip snippet, dll.
@@ -1283,17 +1284,21 @@ function updateLivePreview() {
      \val{f(x)}                 tampilkan hasil hitung ekspresi (ikut berubah saat variabel di-drag)
      \valn{f(x)}{2}             sama, dibulatkan 2 desimal
      \calc{y = f(x) + 1}        hitung, simpan sebagai y (bisa dipakai di \val / \fn / \calc lain), dan tampilkan nilainya
+     \rv{z \sim Normal(x, 1)}   peubah acak z ~ distribusi (Normal, LogNormal, Uniform, Exponential, Bernoulli, Binomial,
+                                Poisson, Geometric; parameter boleh memakai variabel lain). Tampil sebagai angka: seret = geser
+                                persentil, klik = ambil sampel baru, klik dua kali = kembali ke sampel awal. Tooltip menampilkan
+                                grafik distribusinya. \rv{z} memanggil lagi. Fungsi normpdf/normcdf/norminv/binompmf/... bisa di \val.
 
    Ekspresi memakai sintaks mathjs; beberapa LaTeX dikonversi otomatis (\cdot \times \frac \sqrt ^{ } \pi \sin ...).
    Hindari tanda * di dalam $...$ (dibaca markdown sebagai cetak miring) -> pakai \cdot atau spasi.
    Klik dua kali pada angka = kembali ke nilai awal. */
 const TW_KATEX_MACROS = {
   // render pertama (auto-render) hanya perlu tidak error; setupReactiveMath lalu merender ulang dengan nilai sebenarnya
-  '\\var': '#1', '\\sym': '#1', '\\fn': '#1', '\\calc': '#1', '\\val': '#1', '\\valn': '#1\\;#2',
+  '\\var': '#1', '\\sym': '#1', '\\fn': '#1', '\\calc': '#1', '\\val': '#1', '\\valn': '#1\\;#2', '\\rv': '#1',
   '\\rxv': '\\htmlData{svid=#1}{#2}',     // angka/huruf yang bisa di-drag (id = urutan perintah di rumus itu)
   '\\rxc': '\\htmlClass{#1}{#2}'          // hasil hitung (tidak bisa di-drag)
 };
-const RX_CMDS = { var: 1, sym: 1, fn: 1, calc: 1, val: 1, valn: 2 };
+const RX_CMDS = { var: 1, sym: 1, fn: 1, calc: 1, val: 1, valn: 2, rv: 1 };
 const RX_ERR = '\\htmlClass{rx-err}{?}';
 
 /* --- parser kecil: cari perintah \var{..} dst. dengan kurung kurawal seimbang --- */
@@ -1374,6 +1379,27 @@ function rxParseCalc(raw) {
   const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*=\s*([\s\S]+)$/.exec(raw);
   return m ? { name: rxId(m[1]), expr: rxExpr(m[2]) } : null;
 }
+function rxParseRv(raw) {
+  const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*(?:(?:~|\\sim\b)\s*([\s\S]+))?$/.exec(raw);
+  if (!m) return null;
+  const d = { name: rxId(m[1]), tex: m[1], decl: m[2] !== undefined };
+  if (d.decl) {
+    const c = window.TWRandom && TWRandom.parseCall(m[2]);
+    if (!c) return null;
+    d.dist = c.name; d.args = c.args.map(rxExpr);
+  }
+  return d;
+}
+function rxMakeRv(d, mem) {                       // nilai = inv-CDF(u); u awal ditentukan nama (deterministik), u disimpan di memori
+  const h = { __s: TWRandom.hashSeed('rv:' + d.name) | 0 };
+  const u0 = Math.min(0.99, Math.max(0.01, TWRandom.nextU(h))), k = mem[d.name];
+  return { name: d.name, rv: true, dist: d.dist, args: d.args, u0, u: k && k.rv ? k.u : u0, val: NaN, D: null };
+}
+function rxSetU(R, V, u) {
+  u = Math.min(0.9995, Math.max(0.0005, u));
+  if (u === V.u) return;
+  V.u = u; R.mem[V.name] = { rv: true, u }; rxSchedule(R);
+}
 function rxMakeVar(d, mem) {
   const def = d.def;
   const step = d.step > 0 ? d.step : Math.pow(10, -rxDec(d.defStr));
@@ -1408,15 +1434,20 @@ function rxEv(R, expr, scope) {
   return c.evaluate(scope);
 }
 function rxEval(R) {
-  const sc = {};
+  const sc = Object.assign({}, window.TWRandom ? TWRandom.flatFns : null);      // normpdf, normcdf, norminv, binompmf, ...
   for (const n in R.vars) sc[n] = R.vars[n].val;
   R.fns.forEach(f => {
     sc[f.name] = (...a) => { const loc = Object.assign({}, sc); f.params.forEach((p, i) => { loc[p] = a[i]; }); return rxEv(R, f.expr, loc); };
   });
-  let pend = R.calcs.slice();                        // \calc boleh saling merujuk, urutan bebas
+  // \calc dan \rv boleh saling merujuk; urutan bebas -> ulangi sampai tidak ada kemajuan
+  let pend = R.calcs.map(c => ({ name: c.name, run() { const v = rxEv(R, c.expr, sc); if (typeof v !== 'number') throw 0; sc[c.name] = v; } }));
+  for (const n in R.rvs) {
+    const V = R.rvs[n];
+    pend.push({ name: n, run() { const D = TWRandom.make(V.dist, V.args.map(a => +rxEv(R, a, sc))); V.D = D; V.val = D.inv(V.u); sc[n] = V.val; } });
+  }
   while (pend.length) {
     const nx = [];
-    pend.forEach(c => { try { const v = rxEv(R, c.expr, sc); if (typeof v === 'number') sc[c.name] = v; else nx.push(c); } catch (_) { nx.push(c); } });
+    pend.forEach(it => { try { it.run(); } catch (_) { nx.push(it); } });
     if (nx.length === pend.length) break;
     pend = nx;
   }
@@ -1440,9 +1471,13 @@ const rxVarText = V => String(+V.val.toFixed(V.dec));
 function rxCallTex(R, c, id) {
   switch (c.name) {
     case 'fn': return null;                                   // tampil apa adanya (makro \fn)
-    case 'var': case 'sym': {
-      const V = c.d && R.vars[c.d.name]; if (!V) return RX_ERR;
-      return '\\rxv{' + id + '}{' + (c.name === 'sym' ? c.d.tex : rxVarText(V)) + '}';
+    case 'var': case 'sym': case 'rv': {
+      const d = c.d; if (!d) return RX_ERR;
+      const V = R.vars[d.name];
+      if (V) return '\\rxv{' + id + '}{' + (c.name === 'sym' ? d.tex : rxVarText(V)) + '}';
+      const W = R.rvs[d.name];
+      if (!W || R.failed.has(d.name) || !(d.name in R.scope)) return RX_ERR;
+      return '\\rxv{' + id + '}{' + (c.name === 'sym' ? d.tex : rxNum(W.val)) + '}';
     }
     case 'calc': {
       const d = c.d; if (!d || R.failed.has(d.name) || !(d.name in R.scope)) return RX_ERR;
@@ -1488,19 +1523,53 @@ function rxTipEl() {
   return t;
 }
 function rxTipHide(R) { if (R) R.active = null; const t = document.getElementById('mp-tip'); if (t) t.style.display = 'none'; }
+function rxDrawDist(cv, D, x) {                   // kurva densitas/massa; area F(x) diarsir, garis di nilai sekarang
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height, col = getComputedStyle(rxTipEl()).color, acc = '#ffb454';
+  const sd = Math.sqrt(D.variance) || 1, pad = D.discrete ? 0.5 : 0, base = H - 4, top = 4;
+  let lo = Math.min(Math.max(D.support[0], D.mean - 4 * sd), x - pad), hi = Math.max(Math.min(D.support[1], D.mean + 4 * sd), x + pad);
+  if (D.discrete) { lo = Math.floor(lo) - 0.5; hi = Math.ceil(hi) + 0.5; } else if (hi <= lo) { lo -= 0.5; hi += 0.5; }
+  const X = t => 3 + (t - lo) / (hi - lo) * (W - 6);
+  g.clearRect(0, 0, W, H);
+  if (D.discrete) {
+    const ks = []; for (let k = Math.ceil(lo); k <= Math.floor(hi) && ks.length < 120; k++) ks.push(k);
+    const ps = ks.map(D.pdf), ym = Math.max(...ps) || 1;
+    ks.forEach((k, i) => {
+      g.globalAlpha = k === Math.round(x) ? 1 : k < x ? 0.55 : 0.25; g.fillStyle = k === Math.round(x) ? acc : col;
+      const x0 = X(k - 0.5) + 0.5, x1 = X(k + 0.5) - 0.5, h = ps[i] / ym * (base - top);
+      g.fillRect(x0, base - h, Math.max(1, x1 - x0), h);
+    });
+  } else {
+    const S = Array.from({ length: 121 }, (_, i) => lo + (hi - lo) * i / 120), ps = S.map(D.pdf), ym = Math.max(...ps) || 1, Y = p => base - p / ym * (base - top);
+    g.beginPath(); g.moveTo(X(lo), base); S.forEach((s, i) => { if (s <= x) g.lineTo(X(s), Y(ps[i])); }); g.lineTo(X(Math.min(x, hi)), base); g.closePath();
+    g.fillStyle = acc; g.globalAlpha = 0.45; g.fill(); g.globalAlpha = 1;
+    g.beginPath(); S.forEach((s, i) => (i ? g.lineTo(X(s), Y(ps[i])) : g.moveTo(X(s), Y(ps[i])))); g.strokeStyle = col; g.lineWidth = 1.5; g.stroke();
+    g.beginPath(); g.moveTo(X(x), top); g.lineTo(X(x), base); g.strokeStyle = acc; g.lineWidth = 2; g.stroke();
+  }
+  g.globalAlpha = 0.5; g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(3, base + 0.5); g.lineTo(W - 3, base + 0.5); g.stroke(); g.globalAlpha = 1;
+}
 function rxTipRefresh(R) {
   const a = R.active; if (!a) return;
   const el = a.H.host.querySelector('[data-svid="' + a.id + '"]'); if (!el) return;
   el.classList.add('sv-hot');
   const r = el.getBoundingClientRect(), t = rxTipEl();
-  t.innerHTML = '<i>' + a.V.name + '</i> = ' + rxVarText(a.V);
+  if (a.V.rv) {
+    const V = a.V, D = V.D;
+    t.innerHTML = D ? '<i>' + V.name + '</i> ~ ' + D.label + '<br><i>' + V.name + '</i> = ' + rxNum(V.val) + ' &nbsp; F = ' + D.cdf(V.val).toFixed(3)
+                      + '<br><canvas width="190" height="64" style="display:block;margin-top:4px"></canvas>'
+                    : '<i>' + V.name + '</i> ~ ' + V.dist + '(?)';
+    if (D) rxDrawDist(t.querySelector('canvas'), D, V.val);
+  } else t.innerHTML = '<i>' + a.V.name + '</i> = ' + rxVarText(a.V);
   t.style.display = 'block'; t.style.left = (r.left + r.width / 2) + 'px'; t.style.top = (r.top - 8) + 'px';
 }
 
 /* --- interaksi drag per rumus (hit-test berdasarkan koordinat: .vlist KaTeX sering menutupi <span> angka) --- */
 function rxBind(R, H) {
   const host = H.host;
-  const varOf = id => { const c = H.calls[id]; return c && (c.name === 'var' || c.name === 'sym') && c.d ? R.vars[c.d.name] || null : null; };
+  const varOf = id => {
+    const c = H.calls[id];
+    if (!(c && (c.name === 'var' || c.name === 'sym' || c.name === 'rv') && c.d)) return null;
+    return R.vars[c.d.name] || R.rvs[c.d.name] || null;
+  };
   const hit = e => {
     let best = -1, area = Infinity;
     host.querySelectorAll('[data-svid]').forEach(el => {
@@ -1528,15 +1597,23 @@ function rxBind(R, H) {
     e.preventDefault(); host.setPointerCapture(e.pointerId);
     R.active = { H, id, V };
     const now = performance.now();
-    if (id === lastId && now - lastT < 350) { lastT = 0; rxSet(R, V, V.def); rxTipRefresh(R); return; }   // klik dua kali -> reset
-    const x0 = e.clientX, v0 = V.val, pxPerStep = Math.min(24, Math.max(1.5, 250 / Math.max(1, (V.max - V.min) / V.step)));
+    if (id === lastId && now - lastT < 350) {                  // klik dua kali -> kembali ke nilai awal
+      lastT = 0; if (V.rv) rxSetU(R, V, V.u0); else rxSet(R, V, V.def); rxTipRefresh(R); return;
+    }
+    const x0 = e.clientX, base = V.rv ? V.u : V.val;
+    const pxPerStep = V.rv ? 0 : Math.min(24, Math.max(1.5, 250 / Math.max(1, (V.max - V.min) / V.step)));
     let moved = false;
     host.classList.add('sv-dragging'); host.style.cursor = 'ew-resize'; rxTipRefresh(R);
-    const mv = ev => { if (Math.abs(ev.clientX - x0) > 3) moved = true; rxSet(R, V, v0 + Math.round((ev.clientX - x0) / pxPerStep) * V.step); };
+    const mv = ev => {
+      if (Math.abs(ev.clientX - x0) > 3) moved = true;
+      if (V.rv) rxSetU(R, V, base + (ev.clientX - x0) / 300);        // seret = geser persentil peubah acak (300 px ~ seluruh rentang)
+      else rxSet(R, V, base + Math.round((ev.clientX - x0) / pxPerStep) * V.step);
+    };
     const up = () => {
       host.classList.remove('sv-dragging');
       host.removeEventListener('pointermove', mv); host.removeEventListener('pointerup', up); host.removeEventListener('pointercancel', up);
-      if (moved) { lastId = -1; lastT = 0; } else { lastId = id; lastT = performance.now(); }
+      if (moved) { lastId = -1; lastT = 0; }
+      else { lastId = id; lastT = performance.now(); if (V.rv) rxSetU(R, V, Math.random()); }   // klik = ambil sampel baru
     };
     host.addEventListener('pointermove', mv); host.addEventListener('pointerup', up); host.addEventListener('pointercancel', up);
   });
@@ -1553,13 +1630,16 @@ function setupReactiveMath(root) {
   });
   rxTipHide(root._rx);
   if (!hosts.length) { root._rx = null; return; }
-  const R = root._rx = { hosts, vars: {}, fns: [], calcs: [], scope: {}, failed: new Set(), cache: new Map(), raf: 0, active: null,
+  const R = root._rx = { hosts, vars: {}, rvs: {}, fns: [], calcs: [], scope: {}, failed: new Set(), cache: new Map(), raf: 0, active: null,
                          mem: root._rxMem = root._rxMem || {} };
   const seenF = new Set(), seenC = new Set();
   hosts.forEach(H => H.calls.forEach(c => {                    // kumpulkan definisi dari seluruh dokumen (urutan bebas)
     if (c.name === 'var' || c.name === 'sym') {
       const d = c.d = rxParseVar(c.args[0]);
       if (d && d.decl && !R.vars[d.name]) R.vars[d.name] = rxMakeVar(d, R.mem);
+    } else if (c.name === 'rv') {
+      const d = c.d = rxParseRv(c.args[0]);
+      if (d && d.decl && !R.rvs[d.name] && !R.vars[d.name] && window.TWRandom) R.rvs[d.name] = rxMakeRv(d, R.mem);
     } else if (c.name === 'fn') {
       const d = rxParseFn(c.args[0]);
       if (d && !seenF.has(d.name)) { seenF.add(d.name); R.fns.push(d); }
@@ -1569,7 +1649,7 @@ function setupReactiveMath(root) {
     }
   }));
   rxUpdate(R);
-  hosts.forEach(H => { if (H.calls.some(c => (c.name === 'var' || c.name === 'sym') && c.d && R.vars[c.d.name])) rxBind(R, H); });
+  hosts.forEach(H => { if (H.calls.some(c => (c.name === 'var' || c.name === 'sym' || c.name === 'rv') && c.d && (R.vars[c.d.name] || R.rvs[c.d.name]))) rxBind(R, H); });
 }
 
 /* ===== SINKRON SCROLL EDITOR <-> PRATINJAU =====

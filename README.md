@@ -97,3 +97,27 @@ Hasilnya dipakai lagi: $y = \calc{y = f(x) + 1}$, sehingga $y^{2} = \val{y^{2}}$
 
 Catatan: ekspresi memakai sintaks mathjs (beberapa LaTeX dikonversi: `\cdot \times \frac \sqrt ^{ } \pi \sin`). Hindari `*` di dalam `$...$` (dibaca markdown sebagai cetak miring); pakai `\cdot` atau spasi.
 Klik dua kali pada angka mengembalikannya ke nilai awal. Tidak berlaku di blok `steps` dan `graph`.
+
+---
+
+## 🎲 Distribusi & variabel acak
+
+Distribusi tersedia: **Normal, LogNormal, Uniform, Exponential, Bernoulli, Binomial, Poisson, Geometric** (`script/random.js`).
+Angka acak memakai *seed* (hasil bisa diulang persis).
+
+**Di flow engine** (kode node)
+- `random()`, `normal(mu, sigma)`, `lognormal`, `uniform(a, b)`, `exponential(rate)`, `bernoulli(p)`, `binomial(n, p)`, `poisson(lambda)`, `geometric(p)`, `randint(a, b)`, `choice(larik)`, `shuffle(larik)`, `times(n, fn)`.
+  Tambahkan jumlah sebagai argumen terakhir untuk mendapat larik: `xs = normal(0, 1, 500)`.
+- Fungsi peluang: `normpdf(x, mu, s)`, `normcdf`, `norminv`, `binompmf(k, n, p)`, `binomcdf`, `poissonpmf`, `expcdf`, `unifpdf`, ... (awalan `norm unif exp lognorm bern binom poisson geom` + `pdf`/`pmf`/`cdf`/`inv`).
+- `seed: 42` pada diagram membuat hasil tetap; tanpa `seed:` seed dipilih acak saat dimuat. Tombol **🎲 Acak ulang** (muncul otomatis) mengambil seed baru; *Ulangi*, *Mundur*, dan *Eksplorasi* memakai seed yang sama.
+- Tampilan histogram: `view: hist | variabel | jumlah-bin atau auto | Distribusi(param)`
+  contoh `view: hist | xs | auto | Normal(mu, 1)` — larik atau nilai tiap langkah digambar sebagai histogram, kurva/massa teoretis berwarna merah, plus n, rata-rata, s, μ, σ.
+
+**Di variabel reaktif** (dalam `$...$`)
+- `\rv{z \sim Normal(x, 1)}` — peubah acak; parameter boleh memakai variabel lain. Seret = geser persentil, klik = sampel baru, klik dua kali = sampel awal. Tooltip menampilkan grafik distribusi dan F(z). Gunakan `\sim` (bukan `~`) agar tidak dibaca markdown.
+- `\val{normcdf(3, x, 1)}`, `\val{k + 1}`, `\calc{w = 2 \cdot z}` bekerja dengan peubah acak seperti variabel biasa.
+- Nilai awal setiap peubah acak ditentukan namanya (deterministik); u yang sama dipakai saat parameter berubah, jadi `z - x` tetap saat `x` di-drag.
+
+## 🎨 Syntax highlighting editor
+Centang **Highlight** (aktif default). Mewarnai heading, rumus (perintah LaTeX, `\var \fn \val \calc \rv`, nama distribusi), kode inline, `[[tautan]]`, `{{istilah}}`, `#tag`, callout `:::`, kutipan, daftar, tabel, komentar HTML, blok kode (python, js, cpp, julia, dll.) dan blok ```` ```flow ````.
+Dokumen > ±60 KB diwarnai satu frame setelah mengetik; > 300 KB ditampilkan polos.
