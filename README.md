@@ -95,7 +95,7 @@ Dengan $x = \var{x = 3 [-10, 10]}$ maka $f(\var{x}) = \val{f(x)}$.
 Hasilnya dipakai lagi: $y = \calc{y = f(x) + 1}$, sehingga $y^{2} = \val{y^{2}}$.
 ```
 
-Catatan: ekspresi memakai sintaks mathjs (beberapa LaTeX dikonversi: `\cdot \times \frac \sqrt ^{ } \pi \sin`). Hindari `*` di dalam `$...$` (dibaca markdown sebagai cetak miring); pakai `\cdot` atau spasi.
+Catatan: ekspresi memakai sintaks mathjs (beberapa LaTeX dikonversi: `\cdot \times \frac \sqrt ^{ } \pi \sin`). Tanda `*`, `_`, `\\` aman di dalam rumus.
 Klik dua kali pada angka mengembalikannya ke nilai awal. Tidak berlaku di blok `steps` dan `graph`.
 
 ---
@@ -121,3 +121,32 @@ Angka acak memakai *seed* (hasil bisa diulang persis).
 ## 🎨 Syntax highlighting editor
 Centang **Highlight** (aktif default). Mewarnai heading, rumus (perintah LaTeX, `\var \fn \val \calc \rv`, nama distribusi), kode inline, `[[tautan]]`, `{{istilah}}`, `#tag`, callout `:::`, kutipan, daftar, tabel, komentar HTML, blok kode (python, js, cpp, julia, dll.) dan blok ```` ```flow ````.
 Dokumen > ±60 KB diwarnai satu frame setelah mengetik; > 300 KB ditampilkan polos.
+
+
+---
+
+## 🧮 Matriks
+
+**Rumus biasa sekarang berfungsi.** Sebelumnya `marked` menghapus backslash di dalam rumus (`\\` → `\`, `\{` → `{`, `\,` → `,`) dan `*`/`_` bisa menjadi cetak miring, sehingga `\begin{bmatrix}…\\…` rusak. Kini rumus (`$…$`, `$$…$$`, `\(…\)`, `\[…\]`) dilindungi dari markdown; blok kode dan kode inline tidak disentuh.
+*Kompatibilitas:* rumus lama yang memakai trik backslash ganda (`\\\\`, `\\,`, `\\{`) tetap diproses seperti dulu. `TW_PROTECT_MATH = false` di `script.js` mengembalikan perilaku lama sepenuhnya.
+
+**Tombol Matriks** di toolbar editor: pilih ukuran (1–6), nama, isi (identitas / nol / simbol), kurung, dan jenis:
+- *Rumus biasa* → `\begin{bmatrix}…\end{bmatrix}`
+- *Variabel scrub* → `$$A = \mat{A = [1, 0; 0, 1]}$$`
+- *Scrub + grafik transformasi* (2×2) → ditambah blok ```` ```graph ```` dengan `transform: A`.
+
+**Variabel scrub matriks** (di dalam `$…$`): `\mat{A = [1, 0.5; 0, 1] [-3, 3]}` (rentang opsional `[min, maks, langkah]`; juga bisa `[[1,0.5],[0,1]]`). Setiap angka bisa di-drag; klik dua kali = nilai awal. `\mat{A}` menampilkan lagi.
+`\val{det(A)}`, `\val{inv(A)}`, `\calc{B = multiply(A, A)}`: hasil berupa matriks ditampilkan sebagai matriks dan ikut berubah.
+
+**Grafik transformasi linear** di blok ```` ```graph ````:
+```text
+A = [1, 0.5; 0, 1] [-3, 3]    # opsional; bisa juga memakai \mat{A = …} di teks
+transform: A                   # grid, persegi satuan, vektor basis Ae₁ Ae₂, det A
+vector: 1, 1                   # opsional: gambar v dan Av
+```
+Titik ujung **Ae₁ / Ae₂ bisa diseret di grafik** → angka matriks di teks berubah; sebaliknya drag angka di teks → grafik berubah.
+
+## 🪟 Ruang editor lebih luas
+- **Format ▾** (kiri toolbar) menyembunyikan seluruh bar widget; **Info** menyembunyikan vault/folder/slug/judul/tag (kolom wajib yang kosong akan muncul sendiri saat Simpan).
+- **Filter Tag Topik** di sidebar bisa dilipat (menampilkan tag aktif saat terlipat), punya kotak cari, dan daftar chip yang bisa di-scroll.
+- Semua pilihan tersimpan di browser.

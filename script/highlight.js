@@ -6,7 +6,7 @@
    API:  TWHighlight.markdown(src) -> HTML      TWHighlight.attach(textarea, checkbox?) -> {refresh, set}
    Yang diwarnai: heading, **tebal**, *miring*, `kode`, $rumus$ & $$rumus$$ (perintah LaTeX, \var \sym \fn \calc \val \valn \rv,
    nama distribusi), [[tautan]], {{istilah}}, [teks](url), #tag, ::: callout, > kutipan, daftar, tabel, komentar HTML,
-   blok kode (python, js, cpp, julia, ...), dan blok ```flow (param:, view:, seed:, node id [tipe] label | kode -> tujuan).
+   blok kode (python, js, cpp, julia, ...), blok ```graph (transform:, vector:), dan blok ```flow (param:, view:, seed:, node id [tipe] label | kode -> tujuan).
    ========================================================================== */
 (function (root) {
 'use strict';
@@ -65,7 +65,7 @@ function hlCode(line, lang) {
 }
 
 /* ---------- rumus ---------- */
-const TEX_RE = /(\\(?:var|sym|fn|calc|valn|val|rv)(?![A-Za-z]))|(\b(?:Normal|LogNormal|Uniform|Exponential|Bernoulli|Binomial|Poisson|Geometric)\b)|(\\[A-Za-z]+|\\.)|(\d+(?:\.\d+)?)|([{}^_&])/g;
+const TEX_RE = /(\\(?:var|sym|fn|calc|valn|val|rv|mat)(?![A-Za-z]))|(\b(?:Normal|LogNormal|Uniform|Exponential|Bernoulli|Binomial|Poisson|Geometric)\b)|(\\[A-Za-z]+|\\.)|(\d+(?:\.\d+)?)|([{}^_&])/g;
 function hlTex(s) {
   let out = '', last = 0, m; TEX_RE.lastIndex = 0;
   while ((m = TEX_RE.exec(s))) {
@@ -126,6 +126,11 @@ function hlFlowLine(line) {
   return hlCode(line, 'flow');
 }
 
+function hlGraphLine(line) {
+  const m = /^(\s*)(transform|vector)(:)(.*)$/i.exec(line);
+  return m ? esc(m[1]) + sp('key', m[2] + m[3]) + hlCode(m[4], 'graph') : hlCode(line, 'graph');
+}
+
 /* ---------- dokumen ---------- */
 function markdown(src) {
   const lines = String(src).split('\n'), out = [];
@@ -135,7 +140,7 @@ function markdown(src) {
     if (fence) {
       m = /^(\s*)(`{3,}|~{3,})(\s*)$/.exec(line);
       if (m && m[2][0] === fence.ch && m[2].length >= fence.len) { out.push(esc(m[1]) + sp('fence', m[2]) + esc(m[3])); fence = null; }
-      else out.push(fence.lang === 'flow' ? hlFlowLine(line) : hlCode(line, fence.lang));
+      else out.push(fence.lang === 'flow' ? hlFlowLine(line) : fence.lang === 'graph' ? hlGraphLine(line) : hlCode(line, fence.lang));
       continue;
     }
     if (inMath) { out.push(hlMathRaw(line)); if (line.indexOf('$$') >= 0) inMath = false; continue; }

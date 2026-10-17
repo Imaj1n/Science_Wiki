@@ -684,8 +684,10 @@ function renderSidebarTagChips() {
   const container = document.getElementById('sidebar-tag-chips');
   container.innerHTML = '';
 
-  const allTags = ['All', ...new Set(articles.flatMap(a => a.tags || []))];
-  allTags.forEach(tag => {
+  const all = [...new Set(articles.flatMap(a => a.tags || []))];
+  const q = ((document.getElementById('tagfilter-search') || {}).value || '').trim().toLowerCase();
+  const cnt = document.getElementById('tagfilter-count'); if (cnt) cnt.textContent = '(' + all.length + ')';
+  ['All', ...all.filter(t => !q || t.toLowerCase().includes(q) || t === activeTagFilter)].forEach(tag => {
     const chip = document.createElement('button');
     const isActive = activeTagFilter === tag;
     chip.onclick = () => {
@@ -701,6 +703,7 @@ function renderSidebarTagChips() {
     chip.textContent = tag === 'All' ? 'Semua Tag' : `#${tag}`;
     container.appendChild(chip);
   });
+  updateTagFilterSummary();
 }
 
 function renderFolderTreeNav(searchQuery = '') {
@@ -769,18 +772,23 @@ const mpNice=r=>{const p=Math.pow(10,Math.floor(Math.log10(r))),f=r/p;return(f<1
 const mpFmt=v=>Math.abs(v)<1e-9?'0':String(+v.toFixed(4));
 
 function mpParse(src,mem){
-  const params={},curves=[],num='(-?\\d*\\.?\\d+)';
+  let tf=null;
+  const params={},curves=[],vectors=[],num='(-?\\d*\\.?\\d+)';
   const pRe=new RegExp('^([A-Za-z_]\\w*)\\s*=\\s*'+num+'\\s*(?:\\[\\s*'+num+'\\s*,\\s*'+num+'\\s*\\])?$');
   src.split('\n').forEach(raw=>{
     const l=raw.trim(); if(!l||l[0]==='#')return;
-    let m=l.match(pRe);
+    let m=l.match(/^transform\s*:\s*([A-Za-z_]\w*)\s*$/i); if(m){tf={name:m[1]};return;}              // transformasi linear matriks A
+    m=l.match(/^vector\s*:\s*(.+?)\s*,\s*(.+)$/i);                                                      // vector: x, y  (ekspresi boleh memakai parameter/variabel)
+    if(m){let fx=null,fy=null;try{fx=math.compile(m[1]);fy=math.compile(m[2]);}catch(e){}
+      vectors.push({fx,fy,label:vectors.length?'v'+(vectors.length+1):'v'});return;}
+    m=l.match(pRe);
     if(m){const def=+m[2],k=mem[m[1]];
       params[m[1]]={def,val:(k&&k.def===def)?k.val:def,min:m[3]!==undefined?+m[3]:Math.min(-5,def*2),max:m[4]!==undefined?+m[4]:Math.max(5,def*2)};return;}
     m=l.match(/^([A-Za-z_]\w*)\s*\(\s*x\s*\)\s*=\s*(.+)$/);
     if(m){let fn=null;try{fn=math.compile(m[2]);}catch(e){}
       curves.push({name:m[1]+'(x)',fn,color:MP_COLORS[curves.length%MP_COLORS.length]});}
   });
-  return {params,curves};
+  return {params,curves,tf,vectors};
 }
 
 function mpSet(root,n,v){
@@ -803,6 +811,65 @@ function mpZoom(w,f,px,py){
   const ns=Math.min(2000,Math.max(3,v.s*f)); f=ns/v.s;
   const cx=r.width/2+v.ox,cy=r.height/2+v.oy;
   v.ox=px-(px-cx)*f-r.width/2; v.oy=py-(py-cy)*f-r.height/2; v.s=ns;
+}
+
+/* ===== transform: A  — visualisasi transformasi linear 2×2 (grid, persegi satuan, vektor basis, vektor v) =====
+   Matriks A berasal dari \mat{A = [...]} di teks atau baris `A = [..;..]` di blok graph (sistem variabel reaktif).
+   Titik ujung Ae₁ dan Ae₂ bisa diseret langsung di grafik: mengubah entri A, dan angka di teks ikut berubah. */
+function mpArrow(ctx,x0,y0,x1,y1,color,lw,dash){
+  const dx=x1-x0,dy=y1-y0,len=Math.hypot(dx,dy);
+  ctx.save();ctx.strokeStyle=ctx.fillStyle=color;ctx.lineWidth=lw||2.5;ctx.setLineDash(dash||[]);
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();ctx.setLineDash([]);
+  if(len>8){const a=Math.atan2(dy,dx),L=10;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1-L*Math.cos(a-.4),y1-L*Math.sin(a-.4));ctx.lineTo(x1-L*Math.cos(a+.4),y1-L*Math.sin(a+.4));ctx.closePath();ctx.fill();}
+  ctx.restore();
+}
+function mpDrawTF(w,ctx,SX,SY,W,H,base){
+  w.handles=[];w.tfM=null;w.tfInfo=null;
+  const R=w.root._rx,M=R&&R.mats[w.tf.name];
+  ctx.save();ctx.font='12px "Fira Code",monospace';
+  if(!M||M.rows<2||M.cols<2){
+    ctx.fillStyle='#b42318';
+    ctx.fillText(M?'transform: butuh matriks minimal 2×2':'transform: matriks "'+w.tf.name+'" belum didefinisikan (pakai \\mat{'+w.tf.name+' = [...]} atau tulis di blok ini)',10,18);
+    ctx.restore();return;
+  }
+  const m=M.ents.map(r=>r.map(V=>V.val)),a=m[0][0],b=m[0][1],c=m[1][0],d=m[1][1],det=a*d-b*c;
+  w.tfM=M;
+  const P=(x,y)=>[SX(a*x+b*y),SY(c*x+d*y)];
+  const N=12,L=60;
+  for(let i=-N;i<=N;i++){
+    ctx.strokeStyle=i===0?'rgba(37,99,235,.6)':'rgba(37,99,235,.22)';ctx.lineWidth=i===0?1.6:1;
+    let p=P(i,-L),q=P(i,L);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();
+    p=P(-L,i);q=P(L,i);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();
+  }
+  const sq=[P(0,0),P(1,0),P(1,1),P(0,1)];
+  ctx.beginPath();sq.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+  ctx.fillStyle=det<0?'rgba(147,51,234,.16)':'rgba(217,72,15,.16)';ctx.fill();ctx.strokeStyle=det<0?'#9333ea':'#d9480f';ctx.lineWidth=1.8;ctx.stroke();
+  const o=P(0,0),e1=P(1,0),e2=P(0,1);
+  mpArrow(ctx,o[0],o[1],e1[0],e1[1],'#2563eb',2.8);mpArrow(ctx,o[0],o[1],e2[0],e2[1],'#0f9d6b',2.8);
+  ctx.fillStyle='#2563eb';ctx.fillText('Ae₁',e1[0]+10,e1[1]-8);ctx.fillStyle='#0f9d6b';ctx.fillText('Ae₂',e2[0]+10,e2[1]-8);
+  const sc=Object.assign({},R.scope,base);
+  w.vectors.forEach(vv=>{
+    if(!vv.fx)return; let x,y; try{x=vv.fx.evaluate(sc);y=vv.fy.evaluate(sc);}catch(_){return;}
+    if(typeof x!=='number'||typeof y!=='number'||!isFinite(x+y))return;
+    const v0=[SX(x),SY(y)],v1=P(x,y);
+    mpArrow(ctx,o[0],o[1],v0[0],v0[1],'#6b665d',2,[5,4]);mpArrow(ctx,o[0],o[1],v1[0],v1[1],'#9333ea',2.5);
+    ctx.fillStyle='#6b665d';ctx.fillText(vv.label,v0[0]+8,v0[1]+14);ctx.fillStyle='#9333ea';ctx.fillText('A'+vv.label,v1[0]+8,v1[1]-8);
+  });
+  w.handles=[{sx:e1[0],sy:e1[1],color:'#2563eb'},{sx:e2[0],sy:e2[1],color:'#0f9d6b'}];
+  w.handles.forEach((h,i)=>{
+    const hot=(w.hover&&Math.hypot(h.sx-w.hover.x,h.sy-w.hover.y)<=11)||w.hdrag===i;
+    ctx.beginPath();ctx.arc(h.sx,h.sy,hot?9:7,0,7);ctx.fillStyle=h.color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+  });
+  ctx.fillStyle='rgba(27,26,23,.75)';
+  ctx.fillText('det A = '+mpFmt(det)+(Math.abs(det)<1e-9?'  (singular)':det<0?'  (orientasi terbalik)':''),10,H-10);
+  w.tfInfo={m,det,handles:w.handles.map(h=>({sx:h.sx,sy:h.sy}))};
+  ctx.restore();
+}
+function mpHandleAt(w,px,py){return (w.handles||[]).findIndex(h=>Math.hypot(h.sx-px,h.sy-py)<=11);}
+function mpHandleDrag(w,px,py){
+  const R=w.root._rx,M=w.tfM,j=w.hdrag; if(!R||!M||j<0)return;
+  const r=w.canvas.getBoundingClientRect(),v=w.view,wx=(px-(r.width/2+v.ox))/v.s,wy=((r.height/2+v.oy)-py)/v.s;
+  rxSet(R,M.ents[0][j],wx);rxSet(R,M.ents[1][j],wy);
 }
 
 function mpDraw(w){
@@ -830,6 +897,7 @@ function mpDraw(w){
   ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
 
   const base={}; for(const n in w.sc.params)base[n]=w.sc.params[n].val;
+  if(w.tf)mpDrawTF(w,ctx,SX,SY,W,H,base);
   const ev=(cv,x)=>{try{base.x=x;const y=cv.fn.evaluate(base);return(typeof y==='number'&&isFinite(y))?y:NaN;}catch(e){return NaN;}};
   w.curves.forEach(cv=>{
     if(!cv.fn)return;
@@ -871,26 +939,33 @@ function setupInteractiveMath(root){
   mpTipHide();
   const mem=root._mpMem=root._mpMem||{}, sc=root._mp={params:{},widgets:[],raf:0};
   root.querySelectorAll('pre > code.language-graph').forEach(code=>{
-    const {params,curves}=mpParse(code.textContent,mem);
+    const {params,curves,tf,vectors}=mpParse(code.textContent,mem);
     Object.assign(sc.params,params);
     const fig=document.createElement('figure'); fig.className='mp-fig';
     fig.innerHTML='<div class="mp-bar"></div><canvas class="mp-canvas" title="Seret untuk menggeser · Ctrl+scroll untuk zoom"></canvas><div class="mp-foot"><div class="mp-legend"></div><span class="mp-coord"></span><div class="mp-btns"><button type="button" data-a="in">+</button><button type="button" data-a="out">−</button><button type="button" data-a="reset">Reset</button></div></div>';
     code.parentElement.replaceWith(fig);
     const c=fig.querySelector('canvas');
-    const w={sc,canvas:c,curves,view:{s:40,ox:0,oy:0},hover:null,drag:null,coord:fig.querySelector('.mp-coord')};
+    const w={sc,root,canvas:c,curves,tf,vectors,hdrag:-1,handles:[],view:{s:40,ox:0,oy:0},hover:null,drag:null,coord:fig.querySelector('.mp-coord')};
     w.names=Object.keys(params); w.bar=fig.querySelector('.mp-bar');
-    fig.querySelector('.mp-legend').innerHTML=curves.map(cv=>'<span><em style="background:'+cv.color+'"></em>'+cv.name+'</span>').join('');
+    fig.querySelector('.mp-legend').innerHTML=curves.map(cv=>'<span><em style="background:'+cv.color+'"></em>'+cv.name+'</span>').join('')+(tf?'<span><em style="background:#2563eb"></em>Ae₁</span><span><em style="background:#0f9d6b"></em>Ae₂</span>':'');
     fig.querySelector('.mp-btns').addEventListener('click',e=>{
       const a=e.target.dataset.a; if(!a)return;
       if(a==='reset')w.view={s:40,ox:0,oy:0}; else mpZoom(w,a==='in'?1.25:1/1.25);
       mpDraw(w);
     });
-    c.addEventListener('pointerdown',e=>{w.drag={x:e.clientX,y:e.clientY};c.setPointerCapture(e.pointerId);c.classList.add('grab');});
-    c.addEventListener('pointerup',()=>{w.drag=null;c.classList.remove('grab');});
-    c.addEventListener('pointercancel',()=>{w.drag=null;c.classList.remove('grab');});
+    c.addEventListener('pointerdown',e=>{
+      const r=c.getBoundingClientRect(),hh=mpHandleAt(w,e.clientX-r.left,e.clientY-r.top);
+      c.setPointerCapture(e.pointerId);c.classList.add('grab');
+      if(hh>=0){w.hdrag=hh;return;}                                  // seret ujung Ae₁/Ae₂ = ubah entri matriks
+      w.drag={x:e.clientX,y:e.clientY};
+    });
+    c.addEventListener('pointerup',()=>{w.drag=null;w.hdrag=-1;c.classList.remove('grab');mpDraw(w);});
+    c.addEventListener('pointercancel',()=>{w.drag=null;w.hdrag=-1;c.classList.remove('grab');});
     c.addEventListener('pointermove',e=>{
       const r=c.getBoundingClientRect(); w.hover={x:e.clientX-r.left,y:e.clientY-r.top};
-      if(w.drag){w.view.ox+=e.clientX-w.drag.x;w.view.oy+=e.clientY-w.drag.y;w.drag={x:e.clientX,y:e.clientY};}
+      if(w.hdrag>=0)mpHandleDrag(w,w.hover.x,w.hover.y);
+      else{c.style.cursor=mpHandleAt(w,w.hover.x,w.hover.y)>=0?'grab':'';
+        if(w.drag){w.view.ox+=e.clientX-w.drag.x;w.view.oy+=e.clientY-w.drag.y;w.drag={x:e.clientX,y:e.clientY};}}
       mpDraw(w);
     });
     c.addEventListener('pointerleave',()=>{w.hover=null;mpDraw(w);});
@@ -900,6 +975,7 @@ function setupInteractiveMath(root){
     },{passive:false});
     if(window.ResizeObserver)new ResizeObserver(()=>mpDraw(w)).observe(c);
     sc.widgets.push(w);
+    if(tf&&root._rx)root._rx.listeners.push(()=>mpDraw(w));          // matriks berubah -> gambar ulang
   });
   // parameter yang tidak muncul di rumus tampil sebagai huruf scrub di atas grafik
   sc.widgets.forEach(w=>w.names.forEach(n=>{
@@ -1051,11 +1127,88 @@ function setupSteps(root){
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAddVaultModal();});
 
+/* ===== LINDUNGI RUMUS DARI marked =====
+   marked memperlakukan rumus sebagai teks biasa: \\ -> \ (baris matriks hilang), \{ \, \; -> { , ; (backslash dihapus),
+   dan * _ di dalam rumus bisa menjadi cetak miring. Solusi: sebelum marked, rumus ($..$, $$..$$, \(..\), \[..\]) diganti
+   penanda lalu dikembalikan apa adanya sesudahnya. Blok kode berpagar dan kode inline tidak disentuh.
+   Kompatibilitas: rumus lama yang memakai trik backslash ganda (\\\\ , \\, , \\{ ...) dibiarkan diproses marked seperti dulu.
+   TW_PROTECT_MATH = false mengembalikan perilaku lama sepenuhnya. */
+const TW_PROTECT_MATH = true;
+const TW_MATH_LEGACY = /\\{4}|\\\\[,;!:{}|%&#_$]/;
+function protectMath(src) {
+  const store = [], out = [], n = src.length, lineMap = [0];
+  let i = 0, srcLine = 0, lineStart = true, fence = null;
+  const copy = seg => { out.push(seg); for (let k = seg.indexOf('\n'); k >= 0; k = seg.indexOf('\n', k + 1)) lineMap.push(++srcLine); };
+  const stash = (from, to) => {
+    const raw = src.slice(from, to);
+    if (TW_MATH_LEGACY.test(raw)) copy(raw);                    // gaya lama: biarkan seperti sebelumnya
+    else { out.push('\u27E6tw' + store.length + '\u27E7'); store.push(raw); for (let k = raw.indexOf('\n'); k >= 0; k = raw.indexOf('\n', k + 1)) srcLine++; }
+    i = to;
+  };
+  const lineEnd = from => { const e = src.indexOf('\n', from); return e < 0 ? n : e; };
+  const blockOK = raw => !/\n {0,3}(`{3,}|~{3,})/.test(raw) && raw.split('\n').length <= 60;   // jangan melintasi pagar kode / paragraf kebanyakan
+  while (i < n) {
+    if (lineStart) {
+      const e = lineEnd(i), line = src.slice(i, e), fm = /^( {0,3})(`{3,}|~{3,})(.*)$/.exec(line);
+      if (fence) {
+        if (fm && fm[2][0] === fence.ch && fm[2].length >= fence.len && /^\s*$/.test(fm[3])) fence = null;
+        const to = Math.min(n, e + 1); copy(src.slice(i, to)); i = to; continue;
+      }
+      if (fm && !(fm[2][0] === '`' && fm[3].includes('`'))) {
+        fence = { ch: fm[2][0], len: fm[2].length };
+        const to = Math.min(n, e + 1); copy(src.slice(i, to)); i = to; continue;
+      }
+      lineStart = false;
+    }
+    const c = src[i];
+    if (c === '\n') { copy('\n'); i++; lineStart = true; continue; }
+    if (c === '\\') {
+      const d = src[i + 1];
+      if (d === '(' || d === '[') {
+        const j = src.indexOf(d === '(' ? '\\)' : '\\]', i + 2);
+        if (j > 0 && blockOK(src.slice(i, j + 2))) { stash(i, j + 2); continue; }
+      }
+      if (d === undefined || d === '\n') { copy('\\'); i++; continue; }
+      copy(src.slice(i, i + 2)); i += 2; continue;              // lewati karakter yang di-escape, mis. \$
+    }
+    if (c === '`') {
+      let L = 1; while (src[i + L] === '`') L++;
+      let j = i + L, found = -1; const e = lineEnd(i);
+      while (j < e) { if (src[j] === '`') { let K = 1; while (src[j + K] === '`') K++; if (K === L) { found = j; break; } j += K; } else j++; }
+      if (found >= 0) { copy(src.slice(i, found + L)); i = found + L; } else { copy(src.slice(i, i + L)); i += L; }
+      continue;
+    }
+    if (c === '$') {
+      if (src[i + 1] === '$') {
+        const j = src.indexOf('$$', i + 2);
+        if (j > i + 2 && blockOK(src.slice(i, j + 2))) { stash(i, j + 2); continue; }
+        copy('$$'); i += 2; continue;
+      }
+      const e = lineEnd(i); let ok = -1;
+      if (i + 1 < e && !/\s/.test(src[i + 1])) {
+        for (let j = i + 1; j < e; j++) {
+          if (src[j] === '\\') { j++; continue; }
+          if (src[j] === '$') { if (!/\s/.test(src[j - 1]) && !/\d/.test(src[j + 1] || '') && src[j + 1] !== '$') ok = j; break; }
+        }
+      }
+      if (ok > 0) { stash(i, ok + 1); continue; }
+      copy('$'); i++; continue;
+    }
+    copy(c); i++;
+  }
+  return { text: out.join(''), store, lineMap };
+}
+const unprotectMath = (html, store) => (store.length ? html.replace(/\u27E6tw(\d+)\u27E7/g, (m, k) => store[+k].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) : html);
+
 function renderMarkdownAndMath(targetElement, markdownContent) {
-  const pre = preprocessMarkdown(markdownContent);                                 // extras.js: ::: callout + opsi fence
+  const pre0 = preprocessMarkdown(markdownContent);                                // extras.js: ::: callout + opsi fence
+  const preMap = preprocessMarkdown.lastMap;
+  const P = TW_PROTECT_MATH ? protectMath(pre0) : { text: pre0, store: [], lineMap: null };
+  const pre = P.text;
   const isPreview = targetElement.id === 'editor-live-preview';
-  if (isPreview) renderWithSourceLines(targetElement, pre, preprocessMarkdown.lastMap);   // + data-src-line utk sinkron scroll
-  else targetElement.innerHTML = marked.parse(pre);
+  const srcMap = P.lineMap && preMap ? P.lineMap.map(k => preMap[Math.min(k, preMap.length - 1)]) : preMap;   // baris teks terlindungi -> baris asli
+  if (isPreview) renderWithSourceLines(targetElement, pre, srcMap, P.store);        // + data-src-line utk sinkron scroll
+  else targetElement.innerHTML = unprotectMath(marked.parse(pre), P.store);
   targetElement.querySelectorAll('img').forEach(img => { img.loading = 'lazy'; img.decoding = 'async'; });
 
   setupCallouts(targetElement);                       // > [!theorem] ... -> kotak (sebelum KaTeX agar judul bisa memuat rumus)
@@ -1084,10 +1237,10 @@ function renderMarkdownAndMath(targetElement, markdownContent) {
 }
 
 // Peta baris sumber -> blok hasil render (top-level). Dipakai sinkron scroll editor <-> pratinjau.
-function renderWithSourceLines(el, pre, lineMap) {
-  let tokens = null;
-  try { tokens = marked.lexer(pre); el.innerHTML = marked.parser(tokens); }
-  catch (_) { tokens = null; el.innerHTML = marked.parse(pre); }
+function renderWithSourceLines(el, pre, lineMap, store) {
+  let tokens = null; store = store || [];
+  try { tokens = marked.lexer(pre); el.innerHTML = unprotectMath(marked.parser(tokens), store); }
+  catch (_) { tokens = null; el.innerHTML = unprotectMath(marked.parse(pre), store); }
   el._srcLines = null;
   if (!tokens) return;
   const starts = []; let nl = 0;
@@ -1255,6 +1408,7 @@ function initEditorRender() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); renderEditorNow(); }
   });
   initEditorSync();
+  initEditorUi();                                                                // sembunyikan toolbar/info/tag + popover matriks
   if (window.TWHighlight && ta) TWHighlight.attach(ta, document.getElementById('editor-highlight'));   // highlight.js
 }
 
@@ -1273,6 +1427,99 @@ function updateLivePreview() {
   }
 }
 
+/* ===== PENOLONG MATRIKS (popover di toolbar) =====
+   Rumus biasa  : $$ A = \begin{bmatrix} ... \end{bmatrix} $$
+   Variabel scrub: $$ A = \mat{A = [1, 0; 0, 1]} $$   (angka bisa di-drag, bisa dipakai di \val{det(A)} dst.)
+   Scrub + grafik: ditambah blok ```graph dengan `transform: A` (hanya 2×2) */
+function readMatrixOpts() {
+  const g = id => document.getElementById(id), n = (id, lo, hi) => Math.max(lo, Math.min(hi, parseInt(g(id).value, 10) || lo));
+  const o = { rows: n('mx-rows', 1, 6), cols: n('mx-cols', 1, 6), env: g('mx-env').value, fill: g('mx-fill').value, mode: g('mx-mode').value,
+              name: (g('mx-name').value || '').replace(/[^A-Za-z0-9_]/g, '').replace(/^[0-9_]+/, '') };
+  if (o.mode === 'graph') { o.rows = o.cols = 2; }                         // grafik transformasi: 2×2
+  if (o.mode !== 'plain' && o.fill === 'sym') o.fill = 'identity';           // \mat butuh angka
+  if (o.mode !== 'plain' && !o.name) o.name = 'A';
+  return o;
+}
+function buildMatrixMarkdown(o) {
+  const val = (i, j) => (o.fill === 'zero' ? 0 : i === j ? 1 : 0);
+  const grid = Array.from({ length: o.rows }, (_, i) => Array.from({ length: o.cols }, (_, j) => (o.fill === 'sym' ? 'a_{' + (i + 1) + (j + 1) + '}' : String(val(i, j)))));
+  if (o.mode === 'plain') {
+    const body = grid.map(r => r.join(' & ')).join(' \\\\\n');
+    return '\n$$\n' + (o.name ? o.name + ' = ' : '') + '\\begin{' + o.env + '}\n' + body + '\n\\end{' + o.env + '}\n$$\n';
+  }
+  const lit = '[' + grid.map(r => r.join(', ')).join('; ') + ']';
+  let s = '\n$$' + o.name + ' = \\mat{' + o.name + ' = ' + lit + '}$$\n';
+  if (o.mode === 'graph') s += '\n```graph\ntransform: ' + o.name + '\nvector: 1, 1\n```\n';
+  return s;
+}
+function updateMatrixPreview() {
+  const g = id => document.getElementById(id), mode = g('mx-mode').value;
+  const sq = mode === 'graph', plain = mode === 'plain';
+  g('mx-rows').disabled = g('mx-cols').disabled = sq;
+  if (sq) { g('mx-rows').value = 2; g('mx-cols').value = 2; }
+  g('mx-env').disabled = !plain;
+  g('mx-fill').querySelector('option[value="sym"]').disabled = !plain;
+  g('mx-name').placeholder = plain ? '(tanpa nama)' : 'A';
+  g('mx-preview').textContent = buildMatrixMarkdown(readMatrixOpts()).trim();
+}
+function toggleMatrixPopover(force) {
+  const pop = document.getElementById('matrix-pop'); if (!pop) return;
+  const open = force === undefined ? pop.classList.contains('hidden') : !!force;
+  pop.classList.toggle('hidden', !open);
+  if (open) updateMatrixPreview();
+}
+const closeMatrixPopover = () => toggleMatrixPopover(false);
+function insertMatrixFromPopover() {
+  const ta = document.getElementById('editor-content'), md = buildMatrixMarkdown(readMatrixOpts());
+  const s = ta.selectionStart, e = ta.selectionEnd;
+  ta.value = ta.value.substring(0, s) + md + ta.value.substring(e);
+  ta.focus(); ta.setSelectionRange(s + md.length, s + md.length);
+  closeMatrixPopover(); updateLivePreview();
+}
+
+/* ===== SEMBUNYIKAN BAR WIDGET / INFO ARTIKEL / FILTER TAG (kanvas editor lebih luas) ===== */
+function toggleEditorToolbar(force) {
+  const tb = document.getElementById('editor-toolbar'); if (!tb) return;
+  const c = force === undefined ? !tb.classList.contains('tb-collapsed') : !!force;
+  tb.classList.toggle('tb-collapsed', c);
+  const b = document.getElementById('toolbar-toggle'); if (b) b.setAttribute('aria-expanded', String(!c));
+  if (c) closeMatrixPopover();
+  try { localStorage.setItem('tw-toolbar-collapsed', c ? '1' : '0'); } catch (_) {}
+}
+function toggleEditorMeta(force) {
+  const f = document.getElementById('article-editor-form'); if (!f) return;
+  const c = force === undefined ? !f.classList.contains('meta-hidden') : !!force;
+  f.classList.toggle('meta-hidden', c);
+  const b = document.getElementById('meta-toggle'); if (b) b.setAttribute('aria-expanded', String(!c));
+  try { localStorage.setItem('tw-meta-collapsed', c ? '1' : '0'); } catch (_) {}
+}
+function updateTagFilterSummary() {
+  const wrap = document.getElementById('sidebar-tag-wrap'), a = document.getElementById('tagfilter-active'); if (!wrap || !a) return;
+  const active = typeof activeTagFilter === 'string' && activeTagFilter !== 'All';
+  a.textContent = active ? '#' + activeTagFilter : '';
+  a.classList.toggle('hidden', !(active && wrap.classList.contains('tag-collapsed')));
+}
+function toggleTagFilter(force) {
+  const wrap = document.getElementById('sidebar-tag-wrap'); if (!wrap) return;
+  const c = force === undefined ? !wrap.classList.contains('tag-collapsed') : !!force;
+  wrap.classList.toggle('tag-collapsed', c);
+  const b = document.getElementById('tagfilter-toggle'); if (b) b.setAttribute('aria-expanded', String(!c));
+  try { localStorage.setItem('tw-tagfilter-collapsed', c ? '1' : '0'); } catch (_) {}
+  updateTagFilterSummary();
+}
+function initEditorUi() {
+  const saved = k => { try { return localStorage.getItem(k) === '1'; } catch (_) { return false; } };
+  toggleEditorToolbar(saved('tw-toolbar-collapsed')); toggleEditorMeta(saved('tw-meta-collapsed')); toggleTagFilter(saved('tw-tagfilter-collapsed'));
+  const form = document.getElementById('article-editor-form');
+  if (form) form.addEventListener('invalid', () => { if (form.classList.contains('meta-hidden')) toggleEditorMeta(false); }, true);   // kolom wajib kosong tapi tersembunyi -> tampilkan
+  ['mx-rows', 'mx-cols', 'mx-name', 'mx-fill', 'mx-env', 'mx-mode'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', updateMatrixPreview); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMatrixPopover(); });
+  document.addEventListener('pointerdown', e => {
+    const pop = document.getElementById('matrix-pop');
+    if (pop && !pop.classList.contains('hidden') && !pop.contains(e.target) && !e.target.closest('[data-matrix-btn]')) closeMatrixPopover();
+  });
+}
+
 /* ===== VARIABEL REAKTIF DI DALAM RUMUS (gaya Observable / Pluto) =====
    Semua perintah ditulis DI DALAM rumus ($...$ atau $$...$$). Definisi boleh di mana saja; urutan tidak penting.
 
@@ -1284,21 +1531,24 @@ function updateLivePreview() {
      \val{f(x)}                 tampilkan hasil hitung ekspresi (ikut berubah saat variabel di-drag)
      \valn{f(x)}{2}             sama, dibulatkan 2 desimal
      \calc{y = f(x) + 1}        hitung, simpan sebagai y (bisa dipakai di \val / \fn / \calc lain), dan tampilkan nilainya
+     \mat{A = [1, 0.5; 0, 1]}   matriks; setiap angkanya bisa di-drag (rentang opsional: [1,0;0,1] [-3, 3]). \mat{A} memanggil lagi.
+                                \val{det(A)}, \val{inv(A)}, \calc{B = A * A}: hasil berupa matriks ditampilkan sebagai matriks.
+                                Blok ```graph: baris `transform: A` menggambar transformasi linear A (titik ujung vektor basis bisa diseret).
      \rv{z \sim Normal(x, 1)}   peubah acak z ~ distribusi (Normal, LogNormal, Uniform, Exponential, Bernoulli, Binomial,
                                 Poisson, Geometric; parameter boleh memakai variabel lain). Tampil sebagai angka: seret = geser
                                 persentil, klik = ambil sampel baru, klik dua kali = kembali ke sampel awal. Tooltip menampilkan
                                 grafik distribusinya. \rv{z} memanggil lagi. Fungsi normpdf/normcdf/norminv/binompmf/... bisa di \val.
 
    Ekspresi memakai sintaks mathjs; beberapa LaTeX dikonversi otomatis (\cdot \times \frac \sqrt ^{ } \pi \sin ...).
-   Hindari tanda * di dalam $...$ (dibaca markdown sebagai cetak miring) -> pakai \cdot atau spasi.
+   Rumus dilindungi dari markdown (protectMath), jadi * _ \\ \{ \, aman ditulis apa adanya di dalam $...$.
    Klik dua kali pada angka = kembali ke nilai awal. */
 const TW_KATEX_MACROS = {
   // render pertama (auto-render) hanya perlu tidak error; setupReactiveMath lalu merender ulang dengan nilai sebenarnya
-  '\\var': '#1', '\\sym': '#1', '\\fn': '#1', '\\calc': '#1', '\\val': '#1', '\\valn': '#1\\;#2', '\\rv': '#1',
+  '\\var': '#1', '\\sym': '#1', '\\fn': '#1', '\\calc': '#1', '\\val': '#1', '\\valn': '#1\\;#2', '\\rv': '#1', '\\mat': '#1',
   '\\rxv': '\\htmlData{svid=#1}{#2}',     // angka/huruf yang bisa di-drag (id = urutan perintah di rumus itu)
   '\\rxc': '\\htmlClass{#1}{#2}'          // hasil hitung (tidak bisa di-drag)
 };
-const RX_CMDS = { var: 1, sym: 1, fn: 1, calc: 1, val: 1, valn: 2, rv: 1 };
+const RX_CMDS = { var: 1, sym: 1, fn: 1, calc: 1, val: 1, valn: 2, rv: 1, mat: 1 };
 const RX_ERR = '\\htmlClass{rx-err}{?}';
 
 /* --- parser kecil: cari perintah \var{..} dst. dengan kurung kurawal seimbang --- */
@@ -1400,6 +1650,49 @@ function rxSetU(R, V, u) {
   if (u === V.u) return;
   V.u = u; R.mem[V.name] = { rv: true, u }; rxSchedule(R);
 }
+/* --- matriks: \mat{A = [1, 0.5; 0, 1] [-3, 3]}  /  \mat{A} --- */
+function rxMatLit(s) {                            // "[1, 2; 3, 4] [min, maks, langkah]"  atau  "[[1,2],[3,4]]"
+  s = String(s).trim(); if (s[0] !== '[') return null;
+  let depth = 0, end = -1;
+  for (let i = 0; i < s.length; i++) { if (s[i] === '[') depth++; else if (s[i] === ']') { depth--; if (!depth) { end = i; break; } } }
+  if (end < 0) return null;
+  const inner = s.slice(1, end).trim(), rest = s.slice(end + 1).trim();
+  const rowsTxt = inner[0] === '[' ? inner.split(/\]\s*,?\s*\[/).map(r => r.replace(/^\s*\[|\]\s*$/g, '')) : inner.split(';');
+  const cells = rowsTxt.map(r => r.trim().split(/[\s,]+/).filter(Boolean)), C = cells[0] && cells[0].length;
+  const num = /^-?\d*\.?\d+(?:[eE][-+]?\d+)?$/;
+  if (!C || cells.length > 6 || C > 6 || cells.some(r => r.length !== C || r.some(x => !num.test(x)))) return null;
+  const o = { cells, rows: cells.map(r => r.map(parseFloat)), min: NaN, max: NaN, step: NaN };
+  if (rest) {
+    const m = /^\[\s*([^\]]*?)\s*\]$/.exec(rest); if (!m) return null;
+    const p = m[1].split(',').map(x => parseFloat(x)); o.min = p[0]; o.max = p[1]; o.step = p[2];
+  }
+  return o;
+}
+function rxParseMat(raw) {
+  const m = /^\s*(\\?[A-Za-z][A-Za-z0-9_]*)\s*(?:=\s*([\s\S]*))?$/.exec(raw);
+  if (!m) return null;
+  const d = { name: rxId(m[1]), tex: m[1], decl: m[2] !== undefined };
+  if (!d.decl) return d;
+  const lit = rxMatLit(m[2]);
+  return lit ? Object.assign(d, lit) : null;
+}
+function rxMakeMat(d, mem) {                      // setiap entri = variabel scrub bernama A[i,j]; langkah & rentang dipakai bersama
+  const maxDec = Math.max(1, ...d.cells.flat().map(rxDec));
+  const step = d.step > 0 ? d.step : Math.pow(10, -maxDec);
+  const big = Math.max(...d.rows.flat().map(Math.abs));
+  const min = isFinite(d.min) ? d.min : -Math.max(5, Math.ceil(big * 2));
+  const max = isFinite(d.max) ? d.max : Math.max(5, Math.ceil(big * 2));
+  const ents = d.rows.map((row, i) => row.map((def, j) =>
+    rxMakeVar({ name: d.name + '[' + (i + 1) + ',' + (j + 1) + ']', def, defStr: d.cells[i][j], min, max, step }, mem)));
+  return { name: d.name, rows: d.rows.length, cols: d.rows[0].length, ents };
+}
+const rxToVal = v => (v && typeof v.toArray === 'function' ? v.toArray() : v);                       // Matrix mathjs -> larik
+const rxIsNumArr = v => Array.isArray(v) && v.length > 0 && v.every(r => (Array.isArray(r) ? r.length > 0 && r.every(x => typeof x === 'number') : typeof r === 'number'));
+function rxMatTex(a, dec) {
+  const rows = Array.isArray(a[0]) ? a : a.map(x => [x]);                                           // vektor 1D -> kolom
+  return '\\begin{bmatrix}' + rows.map(r => r.map(x => rxNum(x, dec)).join('&')).join('\\\\') + '\\end{bmatrix}';
+}
+
 function rxMakeVar(d, mem) {
   const def = d.def;
   const step = d.step > 0 ? d.step : Math.pow(10, -rxDec(d.defStr));
@@ -1436,11 +1729,12 @@ function rxEv(R, expr, scope) {
 function rxEval(R) {
   const sc = Object.assign({}, window.TWRandom ? TWRandom.flatFns : null);      // normpdf, normcdf, norminv, binompmf, ...
   for (const n in R.vars) sc[n] = R.vars[n].val;
+  for (const n in R.mats) sc[n] = R.mats[n].ents.map(r => r.map(V => V.val));       // matriks sebagai larik 2D
   R.fns.forEach(f => {
     sc[f.name] = (...a) => { const loc = Object.assign({}, sc); f.params.forEach((p, i) => { loc[p] = a[i]; }); return rxEv(R, f.expr, loc); };
   });
   // \calc dan \rv boleh saling merujuk; urutan bebas -> ulangi sampai tidak ada kemajuan
-  let pend = R.calcs.map(c => ({ name: c.name, run() { const v = rxEv(R, c.expr, sc); if (typeof v !== 'number') throw 0; sc[c.name] = v; } }));
+  let pend = R.calcs.map(c => ({ name: c.name, run() { const v = rxToVal(rxEv(R, c.expr, sc)); if (!(typeof v === 'number' || rxIsNumArr(v))) throw 0; sc[c.name] = v; } }));
   for (const n in R.rvs) {
     const V = R.rvs[n];
     pend.push({ name: n, run() { const D = TWRandom.make(V.dist, V.args.map(a => +rxEv(R, a, sc))); V.D = D; V.val = D.inv(V.u); sc[n] = V.val; } });
@@ -1465,7 +1759,7 @@ function rxNum(v, dec) {
   if (+s === 0) s = s.replace('-', '');
   return s;
 }
-function rxFmt(v, dec) { return typeof v === 'number' ? rxNum(v, dec) : typeof v === 'boolean' ? '\\text{' + v + '}' : RX_ERR; }
+function rxFmt(v, dec) { return typeof v === 'number' ? rxNum(v, dec) : rxIsNumArr(v) ? rxMatTex(v, dec) : typeof v === 'boolean' ? '\\text{' + v + '}' : RX_ERR; }
 const rxVarText = V => String(+V.val.toFixed(V.dec));
 
 function rxCallTex(R, c, id) {
@@ -1479,12 +1773,16 @@ function rxCallTex(R, c, id) {
       if (!W || R.failed.has(d.name) || !(d.name in R.scope)) return RX_ERR;
       return '\\rxv{' + id + '}{' + (c.name === 'sym' ? d.tex : rxNum(W.val)) + '}';
     }
+    case 'mat': {
+      const d = c.d, M = d && R.mats[d.name]; if (!M) return RX_ERR;
+      return '\\begin{bmatrix}' + M.ents.map((row, i) => row.map((V, j) => '\\rxv{' + id + ':' + i + ':' + j + '}{' + rxVarText(V) + '}').join('&')).join('\\\\') + '\\end{bmatrix}';
+    }
     case 'calc': {
       const d = c.d; if (!d || R.failed.has(d.name) || !(d.name in R.scope)) return RX_ERR;
       return '\\rxc{rx-val}{' + rxFmt(R.scope[d.name]) + '}';
     }
     default: {                                                // val, valn
-      let v; try { v = rxEv(R, rxExpr(c.args[0]), R.scope); } catch (_) { return RX_ERR; }
+      let v; try { v = rxToVal(rxEv(R, rxExpr(c.args[0]), R.scope)); } catch (_) { return RX_ERR; }
       return '\\rxc{rx-val}{' + rxFmt(v, c.name === 'valn' ? parseInt(c.args[1], 10) : null) + '}';
     }
   }
@@ -1507,6 +1805,7 @@ function rxRenderHost(R, H) {
 function rxUpdate(R) {
   rxEval(R);
   R.hosts.forEach(H => { if (H.dyn) rxRenderHost(R, H); });
+  R.listeners.forEach(f => f());                              // grafik transform: ikut digambar ulang
   if (R.active) rxTipRefresh(R);
 }
 function rxSchedule(R) { if (!R.raf) R.raf = requestAnimationFrame(() => { R.raf = 0; rxUpdate(R); }); }
@@ -1566,16 +1865,18 @@ function rxTipRefresh(R) {
 function rxBind(R, H) {
   const host = H.host;
   const varOf = id => {
-    const c = H.calls[id];
-    if (!(c && (c.name === 'var' || c.name === 'sym' || c.name === 'rv') && c.d)) return null;
+    const q = String(id).split(':'), c = H.calls[+q[0]];
+    if (!(c && c.d)) return null;
+    if (c.name === 'mat') { const M = R.mats[c.d.name]; return M && q.length === 3 && M.ents[+q[1]] ? M.ents[+q[1]][+q[2]] || null : null; }
+    if (!(c.name === 'var' || c.name === 'sym' || c.name === 'rv')) return null;
     return R.vars[c.d.name] || R.rvs[c.d.name] || null;
   };
   const hit = e => {
-    let best = -1, area = Infinity;
+    let best = null, area = Infinity;
     host.querySelectorAll('[data-svid]').forEach(el => {
       const r = el.getBoundingClientRect();
       if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-        const a = r.width * r.height; if (a < area) { area = a; best = +el.dataset.svid; }
+        const a = r.width * r.height; if (a < area) { area = a; best = el.dataset.svid; }
       }
     });
     return best;
@@ -1583,8 +1884,8 @@ function rxBind(R, H) {
   let lastId = -1, lastT = 0;
   host.addEventListener('pointermove', e => {
     if (host.classList.contains('sv-dragging')) return;
-    const id = hit(e), V = id >= 0 ? varOf(id) : null;
-    host.querySelectorAll('.sv-hot').forEach(el => { if (!V || +el.dataset.svid !== id) el.classList.remove('sv-hot'); });
+    const id = hit(e), V = id !== null ? varOf(id) : null;
+    host.querySelectorAll('.sv-hot').forEach(el => { if (!V || el.dataset.svid !== id) el.classList.remove('sv-hot'); });
     host.style.cursor = V ? 'ew-resize' : '';
     if (V) { R.active = { H, id, V }; rxTipRefresh(R); } else rxTipHide(R);
   });
@@ -1593,7 +1894,7 @@ function rxBind(R, H) {
     host.style.cursor = ''; host.querySelectorAll('.sv-hot').forEach(el => el.classList.remove('sv-hot')); rxTipHide(R);
   });
   host.addEventListener('pointerdown', e => {
-    const id = hit(e), V = id >= 0 ? varOf(id) : null; if (!V) return;
+    const id = hit(e), V = id !== null ? varOf(id) : null; if (!V) return;
     e.preventDefault(); host.setPointerCapture(e.pointerId);
     R.active = { H, id, V };
     const now = performance.now();
@@ -1629,14 +1930,22 @@ function setupReactiveMath(root) {
     hosts.push({ host, tex, calls, display: host.classList.contains('katex-display'), lastSrc: null, dyn: calls.some(c => c.name !== 'fn') });
   });
   rxTipHide(root._rx);
-  if (!hosts.length) { root._rx = null; return; }
-  const R = root._rx = { hosts, vars: {}, rvs: {}, fns: [], calcs: [], scope: {}, failed: new Set(), cache: new Map(), raf: 0, active: null,
+  const gdecl = [];                                            // matriks yang dideklarasikan di dalam blok ```graph:  A = [1, 0; 0, 1]
+  root.querySelectorAll('pre > code.language-graph').forEach(code => code.textContent.split('\n').forEach(raw => {
+    const l = raw.replace(/#.*$/, '').trim();
+    if (/^[A-Za-z_]\w*\s*=\s*\[/.test(l)) { const d = rxParseMat(l); if (d && d.decl) gdecl.push(d); }
+  }));
+  if (!hosts.length && !gdecl.length) { root._rx = null; return; }
+  const R = root._rx = { hosts, vars: {}, rvs: {}, mats: {}, listeners: [], fns: [], calcs: [], scope: {}, failed: new Set(), cache: new Map(), raf: 0, active: null,
                          mem: root._rxMem = root._rxMem || {} };
   const seenF = new Set(), seenC = new Set();
   hosts.forEach(H => H.calls.forEach(c => {                    // kumpulkan definisi dari seluruh dokumen (urutan bebas)
     if (c.name === 'var' || c.name === 'sym') {
       const d = c.d = rxParseVar(c.args[0]);
       if (d && d.decl && !R.vars[d.name]) R.vars[d.name] = rxMakeVar(d, R.mem);
+    } else if (c.name === 'mat') {
+      const d = c.d = rxParseMat(c.args[0]);
+      if (d && d.decl && !R.mats[d.name]) R.mats[d.name] = rxMakeMat(d, R.mem);
     } else if (c.name === 'rv') {
       const d = c.d = rxParseRv(c.args[0]);
       if (d && d.decl && !R.rvs[d.name] && !R.vars[d.name] && window.TWRandom) R.rvs[d.name] = rxMakeRv(d, R.mem);
@@ -1648,8 +1957,9 @@ function setupReactiveMath(root) {
       if (d && !seenC.has(d.name)) { seenC.add(d.name); R.calcs.push(d); }
     }
   }));
+  gdecl.forEach(d => { if (!R.mats[d.name]) R.mats[d.name] = rxMakeMat(d, R.mem); });
   rxUpdate(R);
-  hosts.forEach(H => { if (H.calls.some(c => (c.name === 'var' || c.name === 'sym' || c.name === 'rv') && c.d && (R.vars[c.d.name] || R.rvs[c.d.name]))) rxBind(R, H); });
+  hosts.forEach(H => { if (H.calls.some(c => (c.name === 'var' || c.name === 'sym' || c.name === 'rv' || c.name === 'mat') && c.d && (R.vars[c.d.name] || R.rvs[c.d.name] || R.mats[c.d.name]))) rxBind(R, H); });
 }
 
 /* ===== SINKRON SCROLL EDITOR <-> PRATINJAU =====

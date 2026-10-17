@@ -250,9 +250,15 @@
         </div>
 
         <!-- Tag Filter Chips -->
-        <div>
-          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 px-1">Filter Tag Topik</div>
-          <div id="sidebar-tag-chips" class="flex flex-wrap gap-1"></div>
+        <div id="sidebar-tag-wrap">
+          <button type="button" id="tagfilter-toggle" onclick="toggleTagFilter()" aria-expanded="true" title="Sembunyikan / tampilkan filter tag" class="w-full flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 mb-1.5 px-1 text-left">
+            <span>Filter Tag Topik <span id="tagfilter-count" class="font-mono normal-case tracking-normal text-slate-600"></span></span>
+            <span class="flex items-center gap-1.5 min-w-0"><span id="tagfilter-active" class="hidden truncate max-w-[7rem] normal-case tracking-normal font-mono text-amber-400"></span><i class="fa-solid fa-chevron-down tag-chev text-[9px]"></i></span>
+          </button>
+          <div class="tag-body">
+            <input id="tagfilter-search" type="search" placeholder="cari tag…" oninput="renderSidebarTagChips()" class="w-full mb-1.5 px-2 py-1 text-[11px] bg-slate-800 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono">
+            <div id="sidebar-tag-chips" class="flex flex-wrap gap-1 max-h-32 overflow-y-auto pr-1"></div>
+          </div>
         </div>
 
         <!-- Hierarchical Folder Tree -->
@@ -361,7 +367,7 @@
 
         <form id="article-editor-form" onsubmit="handleEditorSubmit(event)" class="space-y-3 flex-1 flex flex-col min-h-0">
           
-          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 shrink-0">
+          <div class="editor-meta-block grid grid-cols-1 sm:grid-cols-4 gap-3 shrink-0">
             <div>
               <label class="block text-xs font-medium text-slate-300 mb-1">Vault Tujuan</label>
               <select id="editor-vault" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200">
@@ -381,14 +387,20 @@
             </div>
           </div>
 
-          <div class="shrink-0">
+          <div class="editor-meta-block shrink-0">
             <label class="block text-xs font-medium text-slate-300 mb-1">Tag Topik (Pisahkan koma)</label>
             <input type="text" id="editor-tags" placeholder="kuantum, simulasi, pde, matematika" class="w-full px-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg focus:border-amber-500 text-slate-200 font-mono">
           </div>
 
           <!-- Quick Formatting Toolbar -->
-          <div class="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0 text-xs">
-            <span class="text-[10px] uppercase tracking-wider font-bold text-slate-500 px-2">Format:</span>
+          <div class="relative shrink-0" id="editor-toolbar-wrap">
+          <div id="editor-toolbar" class="flex flex-wrap items-center gap-1.5 p-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs">
+            <button type="button" id="toolbar-toggle" onclick="toggleEditorToolbar()" aria-expanded="true" title="Sembunyikan / tampilkan bar widget format agar kanvas editor lebih luas" class="tb-toggle px-2 py-1 text-[10px] uppercase tracking-wider font-bold text-slate-400 hover:text-white rounded border border-transparent hover:border-slate-700">
+              <i class="fa-solid fa-chevron-down tb-chev mr-1"></i>Format
+            </button>
+            <button type="button" id="meta-toggle" onclick="toggleEditorMeta()" aria-expanded="true" title="Sembunyikan / tampilkan info artikel (vault, folder, slug, judul, tag)" class="tb-toggle px-2 py-1 text-[10px] uppercase tracking-wider font-bold text-slate-400 hover:text-white rounded border border-transparent hover:border-slate-700">
+              <i class="fa-regular fa-id-card mr-1"></i>Info
+            </button>
             <button type="button" onclick="insertSnippet('table')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
               <i class="fa-solid fa-table mr-1 text-amber-500"></i>Tabel
             </button>
@@ -420,6 +432,9 @@
             <button type="button" onclick="insertSnippet('reactive')" title="Variabel reaktif di dalam rumus: \var \fn \val \calc" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
               <i class="fa-solid fa-arrows-left-right mr-1 text-emerald-400"></i>Variabel Rumus
             </button>
+            <button type="button" data-matrix-btn onclick="toggleMatrixPopover()" title="Buat matriks: rumus biasa, variabel scrub, atau grafik transformasi" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-medium">
+              <i class="fa-solid fa-table-cells mr-1 text-rose-400"></i>Matriks
+            </button>
             <select onchange="insertSnippet(this.value); this.selectedIndex=0" title="Sisipkan kotak/callout" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 text-xs font-medium">
               <option value="">Kotak ▾</option>
               <option value="c-theorem">Teorema</option><option value="c-lemma">Lema</option>
@@ -441,6 +456,33 @@
               <option value="ref-wiki">[[Link artikel]]</option><option value="ref-tag">#tag inline</option><option value="ref-term">{{istilah}}</option>
             </select>
             <span class="text-[10px] text-slate-500 ml-auto hidden sm:inline"><i class="fa-regular fa-paste mr-1"></i>Bisa Paste Gambar (Ctrl+V)</span>
+          </div>
+          <div id="matrix-pop" class="hidden absolute z-30 left-2 top-full mt-1 w-80 max-w-[calc(100vw-2rem)] p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-xl text-xs space-y-2.5">
+            <div class="flex items-center justify-between"><b class="text-slate-200">Buat matriks</b>
+              <button type="button" onclick="closeMatrixPopover()" class="text-slate-400 hover:text-white" title="Tutup (Esc)"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="text-slate-400">Baris<input id="mx-rows" type="number" min="1" max="6" value="2" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200 font-mono"></label>
+              <label class="text-slate-400">Kolom<input id="mx-cols" type="number" min="1" max="6" value="2" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200 font-mono"></label>
+              <label class="text-slate-400">Nama<input id="mx-name" type="text" maxlength="8" value="A" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200 font-mono"></label>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="text-slate-400">Isi<select id="mx-fill" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200">
+                <option value="identity">Identitas (1 di diagonal)</option><option value="zero">Semua nol</option><option value="sym">Simbol a₁₁, a₁₂ …</option></select></label>
+              <label class="text-slate-400">Kurung<select id="mx-env" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200">
+                <option value="bmatrix">[ ] bmatrix</option><option value="pmatrix">( ) pmatrix</option><option value="vmatrix">| | vmatrix</option>
+                <option value="Vmatrix">‖ ‖ Vmatrix</option><option value="Bmatrix">{ } Bmatrix</option><option value="matrix">tanpa kurung</option></select></label>
+            </div>
+            <label class="block text-slate-400">Jenis
+              <select id="mx-mode" class="mt-0.5 w-full px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-200">
+                <option value="plain">Rumus biasa (LaTeX)</option>
+                <option value="scrub">Variabel scrub — angka bisa di-drag</option>
+                <option value="graph">Scrub + grafik transformasi (2×2)</option></select></label>
+            <pre id="mx-preview" class="p-2 bg-slate-800 border border-slate-700 rounded text-[11px] leading-snug text-slate-300 font-mono whitespace-pre overflow-x-auto max-h-32"></pre>
+            <div class="flex justify-end gap-2">
+              <button type="button" onclick="closeMatrixPopover()" class="px-2.5 py-1 text-slate-400 hover:text-white">Batal</button>
+              <button type="button" onclick="insertMatrixFromPopover()" class="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded font-semibold">Sisipkan</button>
+            </div>
+          </div>
           </div>
 
           <!-- Side-by-Side Editor & Live Preview -->

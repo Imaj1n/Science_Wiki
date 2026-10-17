@@ -176,3 +176,13 @@ details.callout[open] .callout-chev{ transform:rotate(180deg); }
 .hl-bq,.hl-li{color:#b8321f}
 .hl-kw{color:#b8321f}.hl-str{color:#0f7a55}.hl-fn{color:#1d4ed8}
 .hl-key{color:#7c3aed}.hl-id{color:#1d4ed8}
+
+
+/* ---- sembunyikan bar widget editor / info artikel / filter tag ---- */
+.tb-chev,.tag-chev{transition:transform .15s}
+#editor-toolbar.tb-collapsed > :not(.tb-toggle){display:none!important}
+#editor-toolbar.tb-collapsed{padding:2px 6px}
+#editor-toolbar.tb-collapsed .tb-chev,#sidebar-tag-wrap.tag-collapsed .tag-chev{transform:rotate(-90deg)}
+#article-editor-form.meta-hidden .editor-meta-block{display:none!important}
+#article-editor-form.meta-hidden #meta-toggle{color:#b8321f}
+#sidebar-tag-wrap.tag-collapsed .tag-body{display:none}
